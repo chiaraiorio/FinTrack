@@ -36,6 +36,10 @@ const PALETTES: ThemePalette[] = [
   { name: 'Oceano Profondo', primary: '#3B82F6', bg: '#F0F7FF', border: '#D1E2F5', card: '#FFFFFF', subBg: '#F0F7FF' },
   { name: 'Sottobosco', primary: '#2D6A4F', bg: '#F1F7F4', border: '#D8E5DF', card: '#FFFFFF', subBg: '#F1F7F4' },
   { name: 'Rosa Rubino', primary: '#9D446E', bg: '#FDF2F7', border: '#F5E1EC', card: '#FFFFFF', subBg: '#FDF2F7' },
+  { name: 'Lavanda Soft', primary: '#8B5CF6', bg: '#F5F3FF', border: '#E9E3FF', card: '#FFFFFF', subBg: '#F5F3FF' },
+  { name: 'Menta Fresca', primary: '#10B981', bg: '#F0FDF4', border: '#DCFCE7', card: '#FFFFFF', subBg: '#F0FDF4' },
+  { name: 'Giallo Crema', primary: '#D97706', bg: '#FFFBEB', border: '#FEF3C7', card: '#FFFFFF', subBg: '#FFFBEB' },
+  { name: 'Tramonto Arancio', primary: '#F97316', bg: '#FFF7ED', border: '#FFEDD5', card: '#FFFFFF', subBg: '#FFF7ED' },
 ];
 
 const DEFAULT_SETTINGS: AppSettings = {

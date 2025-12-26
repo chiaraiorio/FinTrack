@@ -71,6 +71,7 @@ const Settings: React.FC<SettingsProps> = ({
                   onClick={() => onPaletteChange(p)}
                   className={`w-14 h-14 rounded-2xl flex items-center justify-center border-2 transition-all relative ${isActive ? 'bg-white shadow-md' : 'border-transparent bg-[#F5EFE6] opacity-70 hover:opacity-100'}`}
                   style={{ borderColor: isActive ? p.primary : 'transparent' }}
+                  title={p.name}
                 >
                   <div className="w-8 h-8 rounded-full shadow-sm" style={{ backgroundColor: p.primary }} />
                 </button>

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Layout from './components/Layout.tsx';
 import Auth from './components/Auth.tsx';
 import ExpenseForm from './components/ExpenseForm.tsx';
@@ -36,10 +36,6 @@ const PALETTES: ThemePalette[] = [
   { name: 'Oceano Profondo', primary: '#3B82F6', bg: '#F0F7FF', border: '#D1E2F5', card: '#FFFFFF', subBg: '#F0F7FF' },
   { name: 'Sottobosco', primary: '#2D6A4F', bg: '#F1F7F4', border: '#D8E5DF', card: '#FFFFFF', subBg: '#F1F7F4' },
   { name: 'Rosa Rubino', primary: '#9D446E', bg: '#FDF2F7', border: '#F5E1EC', card: '#FFFFFF', subBg: '#FDF2F7' },
-  { name: 'Viola Lavanda', primary: '#8B5CF6', bg: '#F5F3FF', border: '#DDD6FE', card: '#FFFFFF', subBg: '#F5F3FF' },
-  { name: 'Arancio Tramonto', primary: '#F97316', bg: '#FFF7ED', border: '#FFEDD5', card: '#FFFFFF', subBg: '#FFF7ED' },
-  { name: 'Verde Smeraldo', primary: '#10B981', bg: '#ECFDF5', border: '#D1FAE5', card: '#FFFFFF', subBg: '#ECFDF5' },
-  { name: 'Blu Cobalto', primary: '#1D4ED8', bg: '#EFF6FF', border: '#DBEAFE', card: '#FFFFFF', subBg: '#EFF6FF' },
 ];
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -51,25 +47,108 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 const App: React.FC = () => {
+  // --- AUTH STATE ---
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('current_user');
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [language, setLanguage] = useState<Language>(() => {
-    return (localStorage.getItem('app_language') as Language) || 'it';
-  });
-
+  // --- UI STATE ---
   const [viewHistory, setViewHistory] = useState<ViewType[]>(['dashboard']);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [language, setLanguage] = useState<Language>((localStorage.getItem('app_language') as Language) || 'it');
   const [currentTheme, setCurrentTheme] = useState<ThemePalette>(() => {
     const saved = localStorage.getItem('app_theme');
-    if (saved) {
-      return PALETTES.find(p => p.name === saved) || PALETTES[0];
-    }
-    return PALETTES[0];
+    return PALETTES.find(p => p.name === saved) || PALETTES[0];
   });
 
+  // --- DATA STATE (USER-SPECIFIC) ---
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [incomes, setIncomes] = useState<Income[]>([]);
+  const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
+  const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>(INITIAL_INCOME_CATEGORIES);
+  const [accounts, setAccounts] = useState<Account[]>(INITIAL_ACCOUNTS);
+  const [hideBalances, setHideBalances] = useState(localStorage.getItem('hide_balances') === 'true');
+
+  // --- FORMS STATE ---
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isIncomeFormOpen, setIsIncomeFormOpen] = useState(false);
+  const [isTransferFormOpen, setIsTransferFormOpen] = useState(false);
+  const [isFabOpen, setIsFabOpen] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
   const view = viewHistory[viewHistory.length - 1];
+
+  // Helper per chiavi localStorage specifiche per l'utente
+  const getUserKey = useCallback((base: string) => {
+    return currentUser ? `user_${currentUser.id}_${base}` : null;
+  }, [currentUser]);
+
+  // Caricamento dati alla connessione dell'utente
+  useEffect(() => {
+    if (currentUser) {
+      const keys = {
+        expenses: getUserKey('expenses'),
+        incomes: getUserKey('incomes'),
+        categories: getUserKey('categories'),
+        income_categories: getUserKey('income_categories'),
+        accounts: getUserKey('accounts')
+      };
+
+      const load = (key: string | null, fallback: any) => {
+        if (!key) return fallback;
+        const data = localStorage.getItem(key);
+        return data ? JSON.parse(data) : fallback;
+      };
+
+      setExpenses(load(keys.expenses, []));
+      setIncomes(load(keys.incomes, []));
+      setCategories(load(keys.categories, INITIAL_CATEGORIES));
+      setIncomeCategories(load(keys.income_categories, INITIAL_INCOME_CATEGORIES));
+      setAccounts(load(keys.accounts, INITIAL_ACCOUNTS));
+    }
+  }, [currentUser, getUserKey]);
+
+  // Salvataggio dati automatico
+  useEffect(() => {
+    if (!currentUser) return;
+    const save = (key: string | null, data: any) => {
+      if (key) localStorage.setItem(key, JSON.stringify(data));
+    };
+    save(getUserKey('expenses'), expenses);
+    save(getUserKey('incomes'), incomes);
+    save(getUserKey('categories'), categories);
+    save(getUserKey('income_categories'), incomeCategories);
+    save(getUserKey('accounts'), accounts);
+  }, [expenses, incomes, categories, incomeCategories, accounts, currentUser, getUserKey]);
+
+  // Sincronizzazione profilo utente nel database locale
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('current_user', JSON.stringify(currentUser));
+      const allUsers: User[] = JSON.parse(localStorage.getItem('registered_users') || '[]');
+      const updatedUsers = allUsers.map(u => u.id === currentUser.id ? currentUser : u);
+      localStorage.setItem('registered_users', JSON.stringify(updatedUsers));
+    } else {
+      localStorage.removeItem('current_user');
+    }
+  }, [currentUser]);
+
+  // Temi e Accessibilità
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--primary', currentTheme.primary);
+    root.style.setProperty('--bg-app', currentTheme.bg);
+    root.style.setProperty('--border', currentTheme.border);
+    root.style.setProperty('--card-bg', currentTheme.card);
+    root.style.setProperty('--secondary-bg', currentTheme.subBg);
+    
+    const settings = currentUser?.settings || DEFAULT_SETTINGS;
+    const sizes = { small: '14px', medium: '16px', large: '18px' };
+    root.style.fontSize = sizes[settings.textSize];
+    localStorage.setItem('app_theme', currentTheme.name);
+  }, [currentTheme, currentUser?.settings]);
 
   const navigateTo = (newView: ViewType) => {
     if (newView === view) return;
@@ -82,97 +161,18 @@ const App: React.FC = () => {
     }
   };
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [hideBalances, setHideBalances] = useState(() => {
-    return localStorage.getItem('hide_balances') === 'true';
-  });
-  
-  const [expenses, setExpenses] = useState<Expense[]>(() => {
-    const saved = localStorage.getItem('expenses');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [incomes, setIncomes] = useState<Income[]>(() => {
-    const saved = localStorage.getItem('incomes');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [categories, setCategories] = useState<Category[]>(() => {
-    const saved = localStorage.getItem('categories');
-    return saved ? JSON.parse(saved) : INITIAL_CATEGORIES;
-  });
-  const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>(() => {
-    const saved = localStorage.getItem('income_categories');
-    return saved ? JSON.parse(saved) : INITIAL_INCOME_CATEGORIES;
-  });
-  const [accounts, setAccounts] = useState<Account[]>(() => {
-    const saved = localStorage.getItem('accounts');
-    return saved ? JSON.parse(saved) : INITIAL_ACCOUNTS;
-  });
-
-  const userSettings: AppSettings = currentUser?.settings || DEFAULT_SETTINGS;
-
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isIncomeFormOpen, setIsIncomeFormOpen] = useState(false);
-  const [isTransferFormOpen, setIsTransferFormOpen] = useState(false);
-  const [isFabOpen, setIsFabOpen] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-
-  useEffect(() => {
-    const root = document.documentElement;
-    root.style.setProperty('--primary', currentTheme.primary);
-    root.style.setProperty('--bg-app', currentTheme.bg);
-    root.style.setProperty('--border', currentTheme.border);
-    root.style.setProperty('--card-bg', currentTheme.card);
-    root.style.setProperty('--secondary-bg', currentTheme.subBg);
-    
-    // Apply text size
-    const sizes = { small: '14px', medium: '16px', large: '18px' };
-    root.style.fontSize = sizes[userSettings.textSize];
-
-    localStorage.setItem('app_theme', currentTheme.name);
-  }, [currentTheme, userSettings.textSize]);
-
-  useEffect(() => {
-    localStorage.setItem('hide_balances', String(hideBalances));
-  }, [hideBalances]);
-
-  useEffect(() => {
-    localStorage.setItem('app_language', language);
-  }, [language]);
-
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('current_user', JSON.stringify(currentUser));
-      const users: User[] = JSON.parse(localStorage.getItem('registered_users') || '[]');
-      const updatedUsers = users.map(u => u.id === currentUser.id ? currentUser : u);
-      localStorage.setItem('registered_users', JSON.stringify(updatedUsers));
-    } else {
-      localStorage.removeItem('current_user');
-    }
-  }, [currentUser]);
-
-  useEffect(() => {
-    localStorage.setItem('expenses', JSON.stringify(expenses));
-    localStorage.setItem('incomes', JSON.stringify(incomes));
-    localStorage.setItem('categories', JSON.stringify(categories));
-    localStorage.setItem('income_categories', JSON.stringify(incomeCategories));
-    localStorage.setItem('accounts', JSON.stringify(accounts));
-  }, [expenses, incomes, categories, incomeCategories, accounts]);
-
-  const handleUpdateSettings = (newSettings: AppSettings) => {
-    if (currentUser) {
-      setCurrentUser({ ...currentUser, settings: newSettings });
-    }
-  };
-
   const handleLogin = (user: User) => {
     setCurrentUser(user);
-    navigateTo('dashboard');
+    setViewHistory(['dashboard']);
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
     setViewHistory(['auth']);
+    // Reset data state per sicurezza visuale immediata
+    setExpenses([]);
+    setIncomes([]);
+    setAccounts(INITIAL_ACCOUNTS);
   };
 
   const handleSaveExpense = (newExpense: Omit<Expense, 'id'>) => {
@@ -200,22 +200,10 @@ const App: React.FC = () => {
     const toAcc = accounts.find(a => a.id === toId);
     
     const transferExpense: Expense = {
-      id: crypto.randomUUID(),
-      amount,
-      accountId: fromId,
-      categoryId: 'transfer',
-      date,
-      notes: `Giroconto a ${toAcc?.name}. ${notes}`,
-      repeatability: Repeatability.NONE
+      id: crypto.randomUUID(), amount, accountId: fromId, categoryId: 'transfer', date, notes: `Giroconto a ${toAcc?.name}. ${notes}`, repeatability: Repeatability.NONE
     };
-    
     const transferIncome: Income = {
-      id: crypto.randomUUID(),
-      amount,
-      accountId: toId,
-      categoryId: 'transfer',
-      date,
-      notes: `Giroconto da ${fromAcc?.name}. ${notes}`
+      id: crypto.randomUUID(), amount, accountId: toId, categoryId: 'transfer', date, notes: `Giroconto da ${fromAcc?.name}. ${notes}`
     };
     
     setExpenses(prev => [transferExpense, ...prev]);
@@ -243,18 +231,7 @@ const App: React.FC = () => {
     setAccounts(prev => prev.map(a => a.id === inc.accountId ? { ...a, balance: a.balance - inc.amount } : a));
   };
 
-  const handleSettingsBackToMenu = () => {
-    setViewHistory(['dashboard']);
-    setIsSidebarOpen(true);
-  };
-
-  const handleImportData = (data: any) => {
-    if (data.expenses) setExpenses(data.expenses);
-    if (data.incomes) setIncomes(data.incomes);
-    if (data.categories) setCategories(data.categories);
-    if (data.accounts) setAccounts(data.accounts);
-    alert("Dati importati con successo!");
-  };
+  const userSettings = currentUser?.settings || DEFAULT_SETTINGS;
 
   if (!currentUser) {
     return <Auth onLogin={handleLogin} />;
@@ -264,192 +241,32 @@ const App: React.FC = () => {
     switch (view) {
       case 'dashboard':
       case 'financial_analysis':
-        return (
-          <Dashboard 
-            expenses={expenses} 
-            incomes={incomes} 
-            categories={categories} 
-            accounts={accounts} 
-            onOpenSidebar={() => setIsSidebarOpen(true)}
-            isDetailed={view === 'financial_analysis'}
-            onBack={goBack}
-            onNavigate={navigateTo}
-          />
-        );
+        return <Dashboard expenses={expenses} incomes={incomes} categories={categories} accounts={accounts} onOpenSidebar={() => setIsSidebarOpen(true)} isDetailed={view === 'financial_analysis'} onBack={goBack} onNavigate={navigateTo} />;
       case 'categories':
-        return (
-          <CategoryManager 
-            categories={categories} 
-            onAdd={(c) => setCategories([...categories, { ...c, id: crypto.randomUUID() }])}
-            onUpdate={(c) => setCategories(categories.map(cat => cat.id === c.id ? c : cat))}
-            onDelete={(id) => setCategories(categories.filter(c => c.id !== id))}
-            onBack={goBack}
-            onOpenSidebar={() => setIsSidebarOpen(true)}
-          />
-        );
+        return <CategoryManager categories={categories} onAdd={(c) => setCategories([...categories, { ...c, id: crypto.randomUUID() }])} onUpdate={(c) => setCategories(categories.map(cat => cat.id === c.id ? c : cat))} onDelete={(id) => setCategories(categories.filter(c => c.id !== id))} onBack={goBack} onOpenSidebar={() => setIsSidebarOpen(true)} />;
       case 'income_categories':
-        return (
-          <IncomeCategoryManager
-            categories={incomeCategories}
-            onAdd={(c) => setIncomeCategories([...incomeCategories, { ...c, id: crypto.randomUUID() }])}
-            onUpdate={(c) => setIncomeCategories(incomeCategories.map(cat => cat.id === c.id ? c : cat))}
-            onDelete={(id) => setIncomeCategories(incomeCategories.filter(c => c.id !== id))}
-            onBack={goBack}
-          />
-        );
+        return <IncomeCategoryManager categories={incomeCategories} onAdd={(c) => setIncomeCategories([...incomeCategories, { ...c, id: crypto.randomUUID() }])} onUpdate={(c) => setIncomeCategories(incomeCategories.map(cat => cat.id === c.id ? c : cat))} onDelete={(id) => setIncomeCategories(incomeCategories.filter(c => c.id !== id))} onBack={goBack} />;
       case 'accounts':
-        return (
-          <AccountManager 
-            accounts={accounts} 
-            onAdd={(a) => setAccounts([...accounts, { ...a, id: crypto.randomUUID() }])}
-            onUpdate={(a) => setAccounts(accounts.map(acc => acc.id === a.id ? a : acc))}
-            onDelete={(id) => setAccounts(accounts.filter(a => a.id !== id))}
-            onAddIncome={() => setIsIncomeFormOpen(true)}
-            hideBalances={hideBalances}
-            onToggleHideBalances={() => setHideBalances(!hideBalances)}
-            onOpenSidebar={() => setIsSidebarOpen(true)}
-          />
-        );
+        return <AccountManager accounts={accounts} onAdd={(a) => setAccounts([...accounts, { ...a, id: crypto.randomUUID() }])} onUpdate={(a) => setAccounts(accounts.map(acc => acc.id === a.id ? a : acc))} onDelete={(id) => setAccounts(accounts.filter(a => a.id !== id))} onAddIncome={() => setIsIncomeFormOpen(true)} hideBalances={hideBalances} onToggleHideBalances={() => setHideBalances(!hideBalances)} onOpenSidebar={() => setIsSidebarOpen(true)} />;
       case 'settings':
-        return (
-          <Settings 
-            expenses={expenses}
-            incomes={incomes}
-            categories={categories}
-            accounts={accounts}
-            onClearData={() => { if(window.confirm('Cancellare tutto?')) { setExpenses([]); setIncomes([]); } }}
-            onNavigate={navigateTo}
-            onGoToMenu={handleSettingsBackToMenu}
-            palettes={PALETTES}
-            currentPalette={currentTheme}
-            onPaletteChange={setCurrentTheme}
-            language={language}
-            onLanguageChange={setLanguage}
-            settings={userSettings}
-            onUpdateSettings={handleUpdateSettings}
-            onImportData={handleImportData}
-          />
-        );
+        return <Settings expenses={expenses} incomes={incomes} categories={categories} accounts={accounts} onClearData={() => { if(window.confirm('Cancellare tutto?')) { setExpenses([]); setIncomes([]); } }} onNavigate={navigateTo} onGoToMenu={() => { setViewHistory(['dashboard']); setIsSidebarOpen(true); }} palettes={PALETTES} currentPalette={currentTheme} onPaletteChange={setCurrentTheme} language={language} onLanguageChange={setLanguage} settings={userSettings} onUpdateSettings={(s) => setCurrentUser({...currentUser, settings: s})} onImportData={() => {}} />;
       case 'export':
-        return (
-          <ExportManager 
-            expenses={expenses} 
-            incomes={incomes} 
-            categories={categories} 
-            incomeCategories={incomeCategories}
-            accounts={accounts} 
-            onNavigate={navigateTo}
-            onBack={() => navigateTo('dashboard')}
-            onOpenSidebar={() => setIsSidebarOpen(true)}
-          />
-        );
+        return <ExportManager expenses={expenses} incomes={incomes} categories={categories} incomeCategories={incomeCategories} accounts={accounts} onNavigate={navigateTo} onBack={() => navigateTo('dashboard')} onOpenSidebar={() => setIsSidebarOpen(true)} />;
       case 'monthly_reports':
-        return (
-          <MonthlyReports 
-            expenses={expenses} 
-            incomes={incomes} 
-            categories={categories} 
-            accounts={accounts} 
-            onNavigate={navigateTo}
-            onBack={goBack}
-            onOpenSidebar={() => setIsSidebarOpen(true)}
-          />
-        );
+        return <MonthlyReports expenses={expenses} incomes={incomes} categories={categories} accounts={accounts} onNavigate={navigateTo} onBack={goBack} onOpenSidebar={() => setIsSidebarOpen(true)} />;
       case 'profile':
-        return (
-          <ProfileView 
-            user={currentUser} 
-            onUpdateUser={setCurrentUser} 
-            onNavigate={navigateTo} 
-            onBack={goBack}
-            transactionCount={expenses.length + incomes.length}
-            onOpenSidebar={() => setIsSidebarOpen(true)}
-          />
-        );
+        return <ProfileView user={currentUser} onUpdateUser={setCurrentUser} onNavigate={navigateTo} onBack={goBack} transactionCount={expenses.length + incomes.length} onOpenSidebar={() => setIsSidebarOpen(true)} />;
       case 'security':
-        return (
-          <SecurityView 
-            user={currentUser} 
-            onNavigate={navigateTo} 
-            onBack={goBack}
-            onOpenSidebar={() => setIsSidebarOpen(true)}
-          />
-        );
+        return <SecurityView user={currentUser} onNavigate={navigateTo} onBack={goBack} onOpenSidebar={() => setIsSidebarOpen(true)} />;
       case 'income_list':
-        return (
-          <IncomeList 
-            incomes={incomes}
-            incomeCategories={incomeCategories}
-            accounts={accounts}
-            onOpenSidebar={() => setIsSidebarOpen(true)}
-            selectedMonth={selectedMonth}
-            selectedYear={selectedYear}
-            onPrevMonth={() => {
-              if (selectedMonth === 0) { setSelectedMonth(11); setSelectedYear(selectedYear - 1); }
-              else { setSelectedMonth(selectedMonth - 1); }
-            }}
-            onNextMonth={() => {
-              if (selectedMonth === 11) { setSelectedMonth(0); setSelectedYear(selectedYear + 1); }
-              else { setSelectedMonth(selectedMonth + 1); }
-            }}
-            hideBalances={hideBalances}
-            onToggleHideBalances={() => setHideBalances(!hideBalances)}
-            onNavigate={navigateTo}
-            onDeleteIncome={handleDeleteIncome}
-            showDecimals={userSettings.showDecimals}
-          />
-        );
+        return <IncomeList incomes={incomes} incomeCategories={incomeCategories} accounts={accounts} onOpenSidebar={() => setIsSidebarOpen(true)} selectedMonth={selectedMonth} selectedYear={selectedYear} onPrevMonth={() => { if (selectedMonth === 0) { setSelectedMonth(11); setSelectedYear(selectedYear - 1); } else { setSelectedMonth(selectedMonth - 1); } }} onNextMonth={() => { if (selectedMonth === 11) { setSelectedMonth(0); setSelectedYear(selectedYear + 1); } else { setSelectedMonth(selectedMonth + 1); } }} hideBalances={hideBalances} onToggleHideBalances={() => setHideBalances(!hideBalances)} onNavigate={navigateTo} onDeleteIncome={handleDeleteIncome} showDecimals={userSettings.showDecimals} />;
       case 'ai_advisor':
-        return (
-          <AiAdvisor 
-            expenses={expenses}
-            categories={categories}
-            accounts={accounts}
-            onOpenSidebar={() => setIsSidebarOpen(true)}
-            language={language}
-          />
-        );
+        return <AiAdvisor expenses={expenses} categories={categories} accounts={accounts} onOpenSidebar={() => setIsSidebarOpen(true)} language={language} />;
       case 'search':
-        return (
-          <SearchView 
-            expenses={expenses}
-            incomes={incomes}
-            categories={categories}
-            incomeCategories={incomeCategories}
-            accounts={accounts}
-            onBack={goBack}
-            onNavigate={navigateTo}
-            language={language}
-            showDecimals={userSettings.showDecimals}
-            hideBalances={hideBalances}
-          />
-        );
+        return <SearchView expenses={expenses} incomes={incomes} categories={categories} incomeCategories={incomeCategories} accounts={accounts} onBack={goBack} onNavigate={navigateTo} language={language} showDecimals={userSettings.showDecimals} hideBalances={hideBalances} />;
       case 'list':
       default:
-        return (
-          <ExpenseList 
-            expenses={expenses}
-            categories={categories}
-            accounts={accounts}
-            onOpenSidebar={() => setIsSidebarOpen(true)}
-            selectedMonth={selectedMonth}
-            selectedYear={selectedYear}
-            onPrevMonth={() => {
-              if (selectedMonth === 0) { setSelectedMonth(11); setSelectedYear(selectedYear - 1); }
-              else { setSelectedMonth(selectedMonth - 1); }
-            }}
-            onNextMonth={() => {
-              if (selectedMonth === 11) { setSelectedMonth(0); setSelectedYear(selectedYear + 1); }
-              else { setSelectedMonth(selectedMonth + 1); }
-            }}
-            hideBalances={hideBalances}
-            onToggleHideBalances={() => setHideBalances(!hideBalances)}
-            onNavigate={navigateTo}
-            onDeleteExpense={handleDeleteExpense}
-            language={language}
-            showDecimals={userSettings.showDecimals}
-          />
-        );
+        return <ExpenseList expenses={expenses} categories={categories} accounts={accounts} onOpenSidebar={() => setIsSidebarOpen(true)} selectedMonth={selectedMonth} selectedYear={selectedYear} onPrevMonth={() => { if (selectedMonth === 0) { setSelectedMonth(11); setSelectedYear(selectedYear - 1); } else { setSelectedMonth(selectedMonth - 1); } }} onNextMonth={() => { if (selectedMonth === 11) { setSelectedMonth(0); setSelectedYear(selectedYear + 1); } else { setSelectedMonth(selectedMonth + 1); } }} hideBalances={hideBalances} onToggleHideBalances={() => setHideBalances(!hideBalances)} onNavigate={navigateTo} onDeleteExpense={handleDeleteExpense} language={language} showDecimals={userSettings.showDecimals} />;
     }
   };
 
@@ -473,15 +290,7 @@ const App: React.FC = () => {
 
   return (
     <Layout activeView={view} onViewChange={navigateTo} centerButton={Fab} language={language}>
-      <Sidebar 
-        isOpen={isSidebarOpen} 
-        onClose={() => setIsSidebarOpen(false)} 
-        onViewChange={navigateTo} 
-        currentView={view} 
-        user={currentUser} 
-        onLogout={handleLogout} 
-        language={language}
-      />
+      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} onViewChange={navigateTo} currentView={view} user={currentUser} onLogout={handleLogout} language={language} />
       {renderView()}
       {isFormOpen && <ExpenseForm categories={categories} accounts={accounts} onSave={handleSaveExpense} onClose={() => setIsFormOpen(false)} defaultAccountId={userSettings.defaultAccountId} />}
       {isIncomeFormOpen && <IncomeForm accounts={accounts} incomeCategories={incomeCategories} onSave={handleSaveIncome} onClose={() => setIsIncomeFormOpen(false)} />}

@@ -51,11 +51,9 @@ const ExportManager: React.FC<ExportManagerProps> = ({
     let baseExpenses = [...expenses];
     let baseIncomes = [...incomes];
 
-    // Filter by type
     if (dataType === 'expenses') baseIncomes = [];
     if (dataType === 'incomes') baseExpenses = [];
 
-    // Filter by mode
     if (exportMode === 'date') {
       const start = new Date(dateRange.start);
       const end = new Date(dateRange.end);
@@ -67,7 +65,6 @@ const ExportManager: React.FC<ExportManagerProps> = ({
       baseIncomes = baseIncomes.filter(i => { const d = new Date(i.date); return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear; });
     }
 
-    // Filter by category
     if (selectedCategoryId !== 'all') {
       baseExpenses = baseExpenses.filter(e => e.categoryId === selectedCategoryId);
       baseIncomes = baseIncomes.filter(i => i.categoryId === selectedCategoryId);
@@ -92,7 +89,8 @@ const ExportManager: React.FC<ExportManagerProps> = ({
   const executeExport = () => {
     if (!confirmExport) return;
     const format = confirmExport.format;
-    const fileName = `FinTrack_${exportMode}_${new Date().getTime()}`;
+    const timestamp = new Date().getTime();
+    const fileName = `FinTrack_${exportMode}_${timestamp}`;
     
     if (format === 'PDF') {
       const doc = new jsPDF();
@@ -160,13 +158,32 @@ const ExportManager: React.FC<ExportManagerProps> = ({
 
     const newItem: ExportHistoryItem = { 
       id: crypto.randomUUID(), 
-      filename: `${fileName}.${format.toLowerCase() === 'excel' ? 'csv' : format.toLowerCase()}`, 
+      filename: `${fileName}.${format.toLowerCase() === 'excel' ? 'csv' : format.toLowerCase() === 'csv' ? 'csv' : 'pdf'}`, 
       timestamp: new Date().toISOString(), 
       type: format, 
       period: exportMode === 'date' ? `${dateRange.start} - ${dateRange.end}` : exportMode === 'month' ? `${selectedMonth + 1}/${selectedYear}` : 'Filtro Categoria'
     };
     setHistory(prev => [newItem, ...prev].slice(0, 5));
     setConfirmExport(null);
+  };
+
+  const formatHistoryTimestamp = (isoStr: string) => {
+    const d = new Date(isoStr);
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    const time = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    return isToday ? `Oggi, ${time}` : `${d.toLocaleDateString('it-IT')} ${time}`;
+  };
+
+  const getFormatIcon = (type: 'EXCEL' | 'CSV' | 'PDF') => {
+    switch (type) {
+      case 'PDF':
+        return <div className="w-10 h-10 bg-rose-50 text-rose-500 rounded-xl flex items-center justify-center"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2zM9 9h1.5m1.5 0H13m-4 4h4m-4 4h4" /></svg></div>;
+      case 'EXCEL':
+        return <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg></div>;
+      default:
+        return <div className="w-10 h-10 bg-sky-50 text-sky-500 rounded-xl flex items-center justify-center"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg></div>;
+    }
   };
 
   return (
@@ -275,17 +292,25 @@ const ExportManager: React.FC<ExportManagerProps> = ({
       </div>
 
       {history.length > 0 && (
-        <section className="space-y-4">
-          <h3 className="text-[11px] font-black opacity-60 uppercase ml-4">Cronologia Recente</h3>
-          <div className="theme-card rounded-[2rem] overflow-hidden divide-y theme-border bg-white border">
+        <section className="space-y-4 animate-in slide-in-from-bottom duration-700">
+          <div className="flex justify-between items-center px-4">
+            <h3 className="text-[11px] font-black opacity-60 uppercase tracking-widest">Cronologia Recente</h3>
+            <button onClick={() => { if(confirm('Svuotare cronologia?')) setHistory([]); }} className="text-[10px] font-bold theme-primary opacity-40 hover:opacity-100 transition-opacity uppercase">Pulisci</button>
+          </div>
+          <div className="theme-card rounded-[2.5rem] overflow-hidden divide-y theme-border bg-white border shadow-sm">
             {history.map(item => (
-              <div key={item.id} className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="font-black text-[14px] text-[#4A453E] truncate max-w-[180px]">{item.filename}</p>
-                  <p className="text-[10px] text-[#918B82] font-bold uppercase">{item.type} • {item.period}</p>
-                </div>
-                <div className="w-8 h-8 rounded-lg theme-sub-bg flex items-center justify-center text-[#918B82]">
-                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
+              <div key={item.id} className="p-4 flex items-center gap-4 active:theme-sub-bg transition-colors group">
+                {getFormatIcon(item.type)}
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-start">
+                    <p className="font-black text-[14px] text-[#4A453E] truncate max-w-[180px]">{item.filename}</p>
+                    <span className="text-[9px] font-black text-[#918B82] uppercase bg-gray-50 px-2 py-0.5 rounded-md">{item.type}</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-[10px] text-[#918B82] font-bold uppercase">{formatHistoryTimestamp(item.timestamp)}</p>
+                    <span className="text-[#D9D1C5]">/</span>
+                    <p className="text-[9px] text-[#918B82] font-medium truncate opacity-60 italic">{item.period}</p>
+                  </div>
                 </div>
               </div>
             ))}

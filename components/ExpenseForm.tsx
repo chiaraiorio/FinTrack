@@ -9,13 +9,16 @@ interface ExpenseFormProps {
   accounts: Account[];
   onSave: (expense: Omit<Expense, 'id'>) => void;
   onClose: () => void;
+  defaultAccountId?: string;
 }
 
-const ExpenseForm: React.FC<ExpenseFormProps> = ({ categories, accounts, onSave, onClose }) => {
+const ExpenseForm: React.FC<ExpenseFormProps> = ({ categories, accounts, onSave, onClose, defaultAccountId }) => {
   const [formData, setFormData] = useState({
     amount: '',
     categoryId: categories[0]?.id || '',
-    accountId: accounts[0]?.id || '',
+    accountId: defaultAccountId && accounts.some(a => a.id === defaultAccountId) 
+      ? defaultAccountId 
+      : (accounts[0]?.id || ''),
     date: new Date().toISOString().split('T')[0],
     notes: '',
     repeatability: Repeatability.NONE,

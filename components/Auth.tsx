@@ -51,22 +51,22 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
     <div className="min-h-screen bg-[#FAF7F2] flex flex-col items-center justify-center px-6 animate-in fade-in duration-500">
       <div className="w-full max-w-sm space-y-10">
         <div className="text-center space-y-4">
-          {/* Innovativo FT Logo */}
+          {/* Nuovo Monogramma FT Bilanciato */}
           <div className="relative w-24 h-24 mx-auto animate-logo">
             <div className="absolute inset-0 theme-bg-primary rounded-[2rem] rotate-6 opacity-20 scale-110"></div>
             <div className="absolute inset-0 theme-bg-primary rounded-[2rem] -rotate-3 opacity-10"></div>
             <div className="relative w-full h-full theme-bg-primary rounded-[2rem] flex items-center justify-center shadow-xl shadow-current/20 border border-white/20">
               <svg viewBox="0 0 100 100" className="w-14 h-14 text-white fill-current">
-                {/* Monogramma FT Minimalista */}
-                <path d="M25 25 H75 V35 H40 V50 H70 V60 H40 V75 H25 Z" opacity="0.9" /> {/* F stylization */}
-                <path d="M55 25 H85 V35 H75 V75 H65 V35 H55 Z" className="translate-x-4" /> {/* T stylization overlapping */}
+                {/* Monogramma FT con proporzioni identiche */}
+                <path d="M22 25h40v8H32v12h25v8H32v22h-10z" /> {/* F: Spessore 8px, Altezza 50px */}
+                <path d="M48 25h40v8H72v42h-10V33H48z" /> {/* T: Spessore 8px, stessa linea di base e altezza */}
               </svg>
             </div>
           </div>
           
           <div className="pt-2">
             <h1 className="text-4xl font-black text-[#4A453E] tracking-tighter">FinTrack</h1>
-            <p className="text-[#918B82] font-semibold text-sm">Evoluzione Finanziaria Personale</p>
+            <p className="text-[#918B82] font-semibold text-sm">Gestione Finanziaria Personale</p>
           </div>
         </div>
 

@@ -1,7 +1,7 @@
 {
   "name": "FinTrack",
   "short_name": "FinTrack",
-  "description": "Monitoraggio spese intelligente con monogramma FT e analisi Gemini.",
+  "description": "Gestione Finanziaria Personale intelligente con monogramma FT e analisi Gemini.",
   "theme_color": "#8E7C68",
   "background_color": "#FAF7F2",
   "display": "standalone",

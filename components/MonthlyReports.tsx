@@ -58,7 +58,7 @@ const MonthlyReports: React.FC<MonthlyReportsProps> = ({
     const fileName = `Report_${report.monthName}_${report.year}`;
     if (format === 'PDF') {
       const doc = new jsPDF();
-      doc.text(`SpesaSmart - ${report.monthName} ${report.year}`, 14, 20);
+      doc.text(`FinTrack - ${report.monthName} ${report.year}`, 14, 20);
       doc.text(`Entrate: EUR ${report.totalIncome.toFixed(2)} | Uscite: EUR ${report.totalExpense.toFixed(2)}`, 14, 30);
       doc.save(`${fileName}.pdf`);
     } else {
@@ -73,16 +73,7 @@ const MonthlyReports: React.FC<MonthlyReportsProps> = ({
   return (
     <div className="px-5 pt-12 space-y-8 pb-32 animate-in fade-in duration-500">
       <header className="flex flex-col gap-4">
-        <div className="flex justify-between items-center">
-          <button 
-            onClick={onBack}
-            className="flex items-center gap-1 theme-primary -ml-2 active:opacity-50 transition-opacity"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" />
-            </svg>
-            <span className="text-lg font-medium">Indietro</span>
-          </button>
+        <div className="flex justify-start items-center">
           <button 
             onClick={onOpenSidebar}
             className="w-10 h-10 theme-card rounded-full flex items-center justify-center active:scale-90 transition-transform"
@@ -94,17 +85,39 @@ const MonthlyReports: React.FC<MonthlyReportsProps> = ({
       </header>
 
       <div className="space-y-4">
-        {reports.map((report, idx) => (
-          <div key={idx} className="theme-card rounded-[2.5rem] p-6 space-y-4">
-            <h4 className="text-xl font-black text-[#4A453E] capitalize">{report.monthName} {report.year}</h4>
+        {reports.length === 0 ? (
+           <div className="text-center py-20 opacity-40 italic">Nessun dato disponibile per i report.</div>
+        ) : reports.map((report, idx) => (
+          <div key={idx} className="theme-card rounded-[2.5rem] p-6 space-y-4 shadow-sm border theme-border bg-white">
+            <div className="flex justify-between items-start">
+              <h4 className="text-xl font-black text-[#4A453E] capitalize">{report.monthName} {report.year}</h4>
+              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${report.net >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500'}`}>
+                {report.net >= 0 ? '+' : ''}{report.net.toFixed(0)}€
+              </span>
+            </div>
             <div className="grid grid-cols-3 gap-2">
-              <button onClick={() => setConfirmData({report, format: 'PDF'})} className="bg-rose-400 text-white py-3 rounded-2xl text-[10px] font-black uppercase">PDF</button>
-              <button onClick={() => setConfirmData({report, format: 'EXCEL'})} className="bg-emerald-500 text-white py-3 rounded-2xl text-[10px] font-black uppercase">Excel</button>
-              <button onClick={() => setConfirmData({report, format: 'CSV'})} className="theme-bg-primary text-white py-3 rounded-2xl text-[10px] font-black uppercase">CSV</button>
+              <button onClick={() => setConfirmData({report, format: 'PDF'})} className="bg-rose-400 text-white py-3 rounded-2xl text-[10px] font-black uppercase active:scale-95 transition-transform">PDF</button>
+              <button onClick={() => setConfirmData({report, format: 'EXCEL'})} className="bg-emerald-500 text-white py-3 rounded-2xl text-[10px] font-black uppercase active:scale-95 transition-transform">Excel</button>
+              <button onClick={() => setConfirmData({report, format: 'CSV'})} className="theme-bg-primary text-white py-3 rounded-2xl text-[10px] font-black uppercase active:scale-95 transition-transform">CSV</button>
             </div>
           </div>
         ))}
       </div>
+
+      {confirmData && (
+        <div className="fixed inset-0 bg-[#4A453E]/40 backdrop-blur-sm z-[110] flex items-center justify-center p-6">
+          <div className="bg-white w-full max-w-xs rounded-[2.5rem] p-8 shadow-2xl space-y-6 text-center">
+            <h3 className="text-xl font-black text-[#4A453E]">Conferma Download</h3>
+            <p className="text-sm text-[#918B82] font-medium leading-relaxed">
+              Vuoi scaricare il report di {confirmData.report.monthName} in formato {confirmData.format}?
+            </p>
+            <div className="flex flex-col gap-2">
+              <button onClick={executeDownload} className="w-full py-4 theme-bg-primary text-white rounded-2xl font-black text-sm active:scale-95">Conferma</button>
+              <button onClick={() => setConfirmData(null)} className="w-full py-4 theme-sub-bg text-[#918B82] rounded-2xl font-black text-sm active:scale-95">Annulla</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

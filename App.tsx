@@ -1,22 +1,26 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import Layout from './components/Layout';
-import Auth from './components/Auth';
-import ExpenseForm from './components/ExpenseForm';
-import IncomeForm from './components/IncomeForm';
-import TransferForm from './components/TransferForm';
-import Dashboard from './components/Dashboard';
-import CategoryManager from './components/CategoryManager';
-import AccountManager from './components/AccountManager';
-import ExportManager from './components/ExportManager';
-import MonthlyReports from './components/MonthlyReports';
-import Sidebar from './components/Sidebar';
-import Settings from './components/Settings';
-import ProfileView from './components/ProfileView';
-import SecurityView from './components/SecurityView';
-// Fix: Add missing import for CategoryIcon
-import CategoryIcon from './components/CategoryIcon';
-import { Expense, Income, Category, Account, ViewType, Repeatability, User } from './types';
-import { INITIAL_CATEGORIES, INITIAL_ACCOUNTS } from './constants';
+
+import React, { useState, useEffect } from 'react';
+import Layout from './components/Layout.tsx';
+import Auth from './components/Auth.tsx';
+import ExpenseForm from './components/ExpenseForm.tsx';
+import IncomeForm from './components/IncomeForm.tsx';
+import TransferForm from './components/TransferForm.tsx';
+import Dashboard from './components/Dashboard.tsx';
+import CategoryManager from './components/CategoryManager.tsx';
+import IncomeCategoryManager from './components/IncomeCategoryManager.tsx';
+import AccountManager from './components/AccountManager.tsx';
+import ExportManager from './components/ExportManager.tsx';
+import MonthlyReports from './components/MonthlyReports.tsx';
+import Sidebar from './components/Sidebar.tsx';
+import Settings from './components/Settings.tsx';
+import ProfileView from './components/ProfileView.tsx';
+import SecurityView from './components/SecurityView.tsx';
+import IncomeList from './components/IncomeList.tsx';
+import ExpenseList from './components/ExpenseList.tsx';
+import AiAdvisor from './components/AiAdvisor.tsx';
+import SearchView from './components/SearchView.tsx';
+import { Expense, Income, Category, Account, ViewType, Repeatability, User, IncomeCategory, Language, AppSettings } from './types.ts';
+import { INITIAL_CATEGORIES, INITIAL_ACCOUNTS, INITIAL_INCOME_CATEGORIES } from './constants.ts';
 
 export type ThemePalette = {
   name: string;
@@ -38,13 +42,25 @@ const PALETTES: ThemePalette[] = [
   { name: 'Blu Cobalto', primary: '#1D4ED8', bg: '#EFF6FF', border: '#DBEAFE', card: '#FFFFFF', subBg: '#EFF6FF' },
 ];
 
+const DEFAULT_SETTINGS: AppSettings = {
+  monthlyBudget: 0,
+  firstDayOfMonth: 1,
+  defaultAccountId: '',
+  showDecimals: true,
+  textSize: 'medium'
+};
+
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('current_user');
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [viewHistory, setViewHistory] = useState<ViewType[]>(['list']);
+  const [language, setLanguage] = useState<Language>(() => {
+    return (localStorage.getItem('app_language') as Language) || 'it';
+  });
+
+  const [viewHistory, setViewHistory] = useState<ViewType[]>(['dashboard']);
   const [currentTheme, setCurrentTheme] = useState<ThemePalette>(() => {
     const saved = localStorage.getItem('app_theme');
     if (saved) {
@@ -83,10 +99,16 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('categories');
     return saved ? JSON.parse(saved) : INITIAL_CATEGORIES;
   });
+  const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>(() => {
+    const saved = localStorage.getItem('income_categories');
+    return saved ? JSON.parse(saved) : INITIAL_INCOME_CATEGORIES;
+  });
   const [accounts, setAccounts] = useState<Account[]>(() => {
     const saved = localStorage.getItem('accounts');
     return saved ? JSON.parse(saved) : INITIAL_ACCOUNTS;
   });
+
+  const userSettings: AppSettings = currentUser?.settings || DEFAULT_SETTINGS;
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isIncomeFormOpen, setIsIncomeFormOpen] = useState(false);
@@ -102,12 +124,21 @@ const App: React.FC = () => {
     root.style.setProperty('--border', currentTheme.border);
     root.style.setProperty('--card-bg', currentTheme.card);
     root.style.setProperty('--secondary-bg', currentTheme.subBg);
+    
+    // Apply text size
+    const sizes = { small: '14px', medium: '16px', large: '18px' };
+    root.style.fontSize = sizes[userSettings.textSize];
+
     localStorage.setItem('app_theme', currentTheme.name);
-  }, [currentTheme]);
+  }, [currentTheme, userSettings.textSize]);
 
   useEffect(() => {
     localStorage.setItem('hide_balances', String(hideBalances));
   }, [hideBalances]);
+
+  useEffect(() => {
+    localStorage.setItem('app_language', language);
+  }, [language]);
 
   useEffect(() => {
     if (currentUser) {
@@ -124,154 +155,106 @@ const App: React.FC = () => {
     localStorage.setItem('expenses', JSON.stringify(expenses));
     localStorage.setItem('incomes', JSON.stringify(incomes));
     localStorage.setItem('categories', JSON.stringify(categories));
+    localStorage.setItem('income_categories', JSON.stringify(incomeCategories));
     localStorage.setItem('accounts', JSON.stringify(accounts));
-  }, [expenses, incomes, categories, accounts]);
+  }, [expenses, incomes, categories, incomeCategories, accounts]);
+
+  const handleUpdateSettings = (newSettings: AppSettings) => {
+    if (currentUser) {
+      setCurrentUser({ ...currentUser, settings: newSettings });
+    }
+  };
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
-    setViewHistory(['list']);
+    navigateTo('dashboard');
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
+    setViewHistory(['auth']);
   };
 
-  const updateUser = (updatedUser: User) => {
-    setCurrentUser(updatedUser);
-  };
-
-  const processRecurringExpenses = useCallback(() => {
-    const today = new Date().toISOString().split('T')[0];
-    let hasChanges = false;
-    let newExpenses = [...expenses];
-    let newAccounts = [...accounts];
-
-    const getNextDate = (dateStr: string, freq: Repeatability): string => {
-      const d = new Date(dateStr);
-      switch (freq) {
-        case Repeatability.DAILY: d.setDate(d.getDate() + 1); break;
-        case Repeatability.WEEKLY: d.setDate(d.getDate() + 7); break;
-        case Repeatability.MONTHLY: d.setMonth(d.getMonth() + 1); break;
-        case Repeatability.BIMONTHLY: d.setMonth(d.getMonth() + 2); break;
-        case Repeatability.SEMIANNUAL: d.setMonth(d.getMonth() + 6); break;
-        case Repeatability.YEARLY: d.setFullYear(d.getFullYear() + 1); break;
-        default: return dateStr;
-      }
-      return d.toISOString().split('T')[0];
-    };
-
-    newExpenses = newExpenses.map(exp => {
-      if (exp.repeatability === Repeatability.NONE || !exp.isRecurringSource) return exp;
-      let currentSource = { ...exp };
-      let lastProc = currentSource.lastProcessedDate || currentSource.date;
-      let next = getNextDate(lastProc, currentSource.repeatability);
-
-      while (next <= today) {
-        const instance: Expense = {
-          ...currentSource,
-          id: crypto.randomUUID(),
-          date: next,
-          isRecurringSource: false,
-          parentExpenseId: currentSource.id,
-          repeatability: Repeatability.NONE,
-        };
-        newExpenses.push(instance);
-        newAccounts = newAccounts.map(acc => 
-          acc.id === instance.accountId ? { ...acc, balance: acc.balance - instance.amount } : acc
-        );
-        hasChanges = true;
-        lastProc = next;
-        next = getNextDate(lastProc, currentSource.repeatability);
-      }
-      return { ...currentSource, lastProcessedDate: lastProc };
-    });
-
-    if (hasChanges) {
-      setExpenses(newExpenses);
-      setAccounts(newAccounts);
-    }
-  }, [expenses, accounts]);
-
-  useEffect(() => { 
-    if (currentUser) processRecurringExpenses(); 
-  }, [currentUser, processRecurringExpenses]);
-
-  const addExpense = (newExp: Omit<Expense, 'id'>) => {
-    const isRecurring = newExp.repeatability !== Repeatability.NONE;
-    const expense: Expense = { 
-      ...newExp, 
-      id: crypto.randomUUID(),
-      isRecurringSource: isRecurring,
-      lastProcessedDate: newExp.date 
-    };
+  const handleSaveExpense = (newExpense: Omit<Expense, 'id'>) => {
+    const expense: Expense = { ...newExpense, id: crypto.randomUUID() };
     setExpenses(prev => [expense, ...prev]);
-    setAccounts(prev => prev.map(acc => acc.id === expense.accountId ? { ...acc, balance: acc.balance - expense.amount } : acc));
-    if (isRecurring) setTimeout(processRecurringExpenses, 0);
-  };
-
-  const addIncome = (newInc: Omit<Income, 'id'>) => {
-    const income: Income = { ...newInc, id: crypto.randomUUID() };
-    setIncomes(prev => [income, ...prev]);
-    setAccounts(prev => prev.map(acc => acc.id === income.accountId ? { ...acc, balance: acc.balance + income.amount } : acc));
-  };
-
-  const handleTransfer = (amount: number, fromId: string, toId: string, notes: string, date: string) => {
-    setAccounts(prev => prev.map(acc => {
-      if (acc.id === fromId) return { ...acc, balance: acc.balance - amount };
-      if (acc.id === toId) return { ...acc, balance: acc.balance + amount };
-      return acc;
-    }));
-  };
-
-  const deleteExpense = (id: string) => {
-    const expense = expenses.find(e => e.id === id);
-    if (!expense) return;
-    setAccounts(prev => prev.map(acc => acc.id === expense.accountId ? { ...acc, balance: acc.balance + expense.amount } : acc));
-    setExpenses(expenses.filter(e => e.id !== id));
-  };
-
-  const addCategory = (cat: Omit<Category, 'id'>) => setCategories([...categories, { ...cat, id: crypto.randomUUID() }]);
-  const updateCategory = (updatedCat: Category) => setCategories(categories.map(c => c.id === updatedCat.id ? updatedCat : c));
-  const deleteCategory = (id: string) => setCategories(categories.filter(c => c.id !== id));
-  
-  const addAccount = (acc: Omit<Account, 'id'>) => setAccounts([...accounts, { ...acc, id: crypto.randomUUID() }]);
-  const updateAccount = (updatedAcc: Account) => setAccounts(accounts.map(a => a.id === updatedAcc.id ? updatedAcc : a));
-  const deleteAccount = (id: string) => setAccounts(accounts.filter(a => a.id !== id));
-  
-  const moveAccount = (index: number, direction: 'up' | 'down') => {
-    const newAccounts = [...accounts];
-    const newIndex = direction === 'up' ? index - 1 : index + 1;
-    if (newIndex < 0 || newIndex >= newAccounts.length) return;
-    [newAccounts[index], newAccounts[newIndex]] = [newAccounts[newIndex], newAccounts[index]];
-    setAccounts(newAccounts);
-  };
-
-  const clearAllData = () => {
-    if (window.confirm("Sei sicuro di voler cancellare tutti i dati? L'operazione è irreversibile.")) {
-      setExpenses([]);
-      setIncomes([]);
-      setCategories(INITIAL_CATEGORIES);
-      setAccounts(INITIAL_ACCOUNTS);
-      localStorage.removeItem('expenses');
-      localStorage.removeItem('incomes');
-      localStorage.removeItem('categories');
-      localStorage.removeItem('accounts');
-      window.location.reload();
-    }
-  };
-
-  const filteredExpenses = useMemo(() => {
-    return expenses.filter(e => {
-      const d = new Date(e.date);
-      return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
-    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [expenses, selectedMonth, selectedYear]);
-
-  const monthName = new Date(selectedYear, selectedMonth).toLocaleString('it-IT', { month: 'long' });
-
-  useEffect(() => {
+    setAccounts(prev => prev.map(a => 
+      a.id === expense.accountId ? { ...a, balance: a.balance - expense.amount } : a
+    ));
+    setIsFormOpen(false);
     setIsFabOpen(false);
-  }, [view]);
+  };
+
+  const handleSaveIncome = (newIncome: Omit<Income, 'id'>) => {
+    const income: Income = { ...newIncome, id: crypto.randomUUID() };
+    setIncomes(prev => [income, ...prev]);
+    setAccounts(prev => prev.map(a => 
+      a.id === income.accountId ? { ...a, balance: a.balance + income.amount } : a
+    ));
+    setIsIncomeFormOpen(false);
+    setIsFabOpen(false);
+  };
+
+  const handleSaveTransfer = (amount: number, fromId: string, toId: string, notes: string, date: string) => {
+    const fromAcc = accounts.find(a => a.id === fromId);
+    const toAcc = accounts.find(a => a.id === toId);
+    
+    const transferExpense: Expense = {
+      id: crypto.randomUUID(),
+      amount,
+      accountId: fromId,
+      categoryId: 'transfer',
+      date,
+      notes: `Giroconto a ${toAcc?.name}. ${notes}`,
+      repeatability: Repeatability.NONE
+    };
+    
+    const transferIncome: Income = {
+      id: crypto.randomUUID(),
+      amount,
+      accountId: toId,
+      categoryId: 'transfer',
+      date,
+      notes: `Giroconto da ${fromAcc?.name}. ${notes}`
+    };
+    
+    setExpenses(prev => [transferExpense, ...prev]);
+    setIncomes(prev => [transferIncome, ...prev]);
+    setAccounts(prev => prev.map(a => {
+      if (a.id === fromId) return { ...a, balance: a.balance - amount };
+      if (a.id === toId) return { ...a, balance: a.balance + amount };
+      return a;
+    }));
+    setIsTransferFormOpen(false);
+    setIsFabOpen(false);
+  };
+
+  const handleDeleteExpense = (id: string) => {
+    const exp = expenses.find(e => e.id === id);
+    if (!exp) return;
+    setExpenses(prev => prev.filter(e => e.id !== id));
+    setAccounts(prev => prev.map(a => a.id === exp.accountId ? { ...a, balance: a.balance + exp.amount } : a));
+  };
+
+  const handleDeleteIncome = (id: string) => {
+    const inc = incomes.find(i => i.id === id);
+    if (!inc) return;
+    setIncomes(prev => prev.filter(i => i.id !== id));
+    setAccounts(prev => prev.map(a => a.id === inc.accountId ? { ...a, balance: a.balance - inc.amount } : a));
+  };
+
+  const handleSettingsBackToMenu = () => {
+    setViewHistory(['dashboard']);
+    setIsSidebarOpen(true);
+  };
+
+  const handleImportData = (data: any) => {
+    if (data.expenses) setExpenses(data.expenses);
+    if (data.incomes) setIncomes(data.incomes);
+    if (data.categories) setCategories(data.categories);
+    if (data.accounts) setAccounts(data.accounts);
+    alert("Dati importati con successo!");
+  };
 
   if (!currentUser) {
     return <Auth onLogin={handleLogin} />;
@@ -279,185 +262,230 @@ const App: React.FC = () => {
 
   const renderView = () => {
     switch (view) {
-      case 'dashboard': return <Dashboard expenses={expenses} incomes={incomes} categories={categories} accounts={accounts} onOpenSidebar={() => setIsSidebarOpen(true)} />;
-      case 'categories': return <CategoryManager categories={categories} onAdd={addCategory} onUpdate={updateCategory} onDelete={deleteCategory} onBack={goBack} onOpenSidebar={() => setIsSidebarOpen(true)} />;
-      case 'accounts': return <AccountManager accounts={accounts} onAdd={addAccount} onUpdate={updateAccount} onDelete={deleteAccount} onMove={moveAccount} onAddIncome={() => setIsIncomeFormOpen(true)} hideBalances={hideBalances} onToggleHideBalances={() => setHideBalances(!hideBalances)} onOpenSidebar={() => setIsSidebarOpen(true)} />;
-      case 'settings': return <Settings expenses={expenses} categories={categories} accounts={accounts} onClearData={clearAllData} onNavigate={navigateTo} onBack={goBack} palettes={PALETTES} currentPalette={currentTheme} onPaletteChange={setCurrentTheme} onOpenSidebar={() => setIsSidebarOpen(true)} />;
-      case 'export': return <ExportManager expenses={expenses} incomes={incomes} categories={categories} accounts={accounts} onNavigate={navigateTo} onBack={goBack} onOpenSidebar={() => setIsSidebarOpen(true)} />;
-      case 'monthly_reports': return <MonthlyReports expenses={expenses} incomes={incomes} categories={categories} accounts={accounts} onNavigate={navigateTo} onBack={goBack} onOpenSidebar={() => setIsSidebarOpen(true)} />;
-      case 'profile': return <ProfileView user={currentUser} onUpdateUser={updateUser} onNavigate={navigateTo} onBack={goBack} transactionCount={expenses.length + incomes.length} onOpenSidebar={() => setIsSidebarOpen(true)} />;
-      case 'security': return <SecurityView user={currentUser} onNavigate={navigateTo} onBack={goBack} onOpenSidebar={() => setIsSidebarOpen(true)} />;
+      case 'dashboard':
+      case 'financial_analysis':
+        return (
+          <Dashboard 
+            expenses={expenses} 
+            incomes={incomes} 
+            categories={categories} 
+            accounts={accounts} 
+            onOpenSidebar={() => setIsSidebarOpen(true)}
+            isDetailed={view === 'financial_analysis'}
+            onBack={goBack}
+            onNavigate={navigateTo}
+          />
+        );
+      case 'categories':
+        return (
+          <CategoryManager 
+            categories={categories} 
+            onAdd={(c) => setCategories([...categories, { ...c, id: crypto.randomUUID() }])}
+            onUpdate={(c) => setCategories(categories.map(cat => cat.id === c.id ? c : cat))}
+            onDelete={(id) => setCategories(categories.filter(c => c.id !== id))}
+            onBack={goBack}
+            onOpenSidebar={() => setIsSidebarOpen(true)}
+          />
+        );
+      case 'income_categories':
+        return (
+          <IncomeCategoryManager
+            categories={incomeCategories}
+            onAdd={(c) => setIncomeCategories([...incomeCategories, { ...c, id: crypto.randomUUID() }])}
+            onUpdate={(c) => setIncomeCategories(incomeCategories.map(cat => cat.id === c.id ? c : cat))}
+            onDelete={(id) => setIncomeCategories(incomeCategories.filter(c => c.id !== id))}
+            onBack={goBack}
+          />
+        );
+      case 'accounts':
+        return (
+          <AccountManager 
+            accounts={accounts} 
+            onAdd={(a) => setAccounts([...accounts, { ...a, id: crypto.randomUUID() }])}
+            onUpdate={(a) => setAccounts(accounts.map(acc => acc.id === a.id ? a : acc))}
+            onDelete={(id) => setAccounts(accounts.filter(a => a.id !== id))}
+            onAddIncome={() => setIsIncomeFormOpen(true)}
+            hideBalances={hideBalances}
+            onToggleHideBalances={() => setHideBalances(!hideBalances)}
+            onOpenSidebar={() => setIsSidebarOpen(true)}
+          />
+        );
+      case 'settings':
+        return (
+          <Settings 
+            expenses={expenses}
+            incomes={incomes}
+            categories={categories}
+            accounts={accounts}
+            onClearData={() => { if(window.confirm('Cancellare tutto?')) { setExpenses([]); setIncomes([]); } }}
+            onNavigate={navigateTo}
+            onGoToMenu={handleSettingsBackToMenu}
+            palettes={PALETTES}
+            currentPalette={currentTheme}
+            onPaletteChange={setCurrentTheme}
+            language={language}
+            onLanguageChange={setLanguage}
+            settings={userSettings}
+            onUpdateSettings={handleUpdateSettings}
+            onImportData={handleImportData}
+          />
+        );
+      case 'export':
+        return (
+          <ExportManager 
+            expenses={expenses} 
+            incomes={incomes} 
+            categories={categories} 
+            incomeCategories={incomeCategories}
+            accounts={accounts} 
+            onNavigate={navigateTo}
+            onBack={() => navigateTo('dashboard')}
+            onOpenSidebar={() => setIsSidebarOpen(true)}
+          />
+        );
+      case 'monthly_reports':
+        return (
+          <MonthlyReports 
+            expenses={expenses} 
+            incomes={incomes} 
+            categories={categories} 
+            accounts={accounts} 
+            onNavigate={navigateTo}
+            onBack={goBack}
+            onOpenSidebar={() => setIsSidebarOpen(true)}
+          />
+        );
+      case 'profile':
+        return (
+          <ProfileView 
+            user={currentUser} 
+            onUpdateUser={setCurrentUser} 
+            onNavigate={navigateTo} 
+            onBack={goBack}
+            transactionCount={expenses.length + incomes.length}
+            onOpenSidebar={() => setIsSidebarOpen(true)}
+          />
+        );
+      case 'security':
+        return (
+          <SecurityView 
+            user={currentUser} 
+            onNavigate={navigateTo} 
+            onBack={goBack}
+            onOpenSidebar={() => setIsSidebarOpen(true)}
+          />
+        );
+      case 'income_list':
+        return (
+          <IncomeList 
+            incomes={incomes}
+            incomeCategories={incomeCategories}
+            accounts={accounts}
+            onOpenSidebar={() => setIsSidebarOpen(true)}
+            selectedMonth={selectedMonth}
+            selectedYear={selectedYear}
+            onPrevMonth={() => {
+              if (selectedMonth === 0) { setSelectedMonth(11); setSelectedYear(selectedYear - 1); }
+              else { setSelectedMonth(selectedMonth - 1); }
+            }}
+            onNextMonth={() => {
+              if (selectedMonth === 11) { setSelectedMonth(0); setSelectedYear(selectedYear + 1); }
+              else { setSelectedMonth(selectedMonth + 1); }
+            }}
+            hideBalances={hideBalances}
+            onToggleHideBalances={() => setHideBalances(!hideBalances)}
+            onNavigate={navigateTo}
+            onDeleteIncome={handleDeleteIncome}
+            showDecimals={userSettings.showDecimals}
+          />
+        );
+      case 'ai_advisor':
+        return (
+          <AiAdvisor 
+            expenses={expenses}
+            categories={categories}
+            accounts={accounts}
+            onOpenSidebar={() => setIsSidebarOpen(true)}
+            language={language}
+          />
+        );
+      case 'search':
+        return (
+          <SearchView 
+            expenses={expenses}
+            incomes={incomes}
+            categories={categories}
+            incomeCategories={incomeCategories}
+            accounts={accounts}
+            onBack={goBack}
+            onNavigate={navigateTo}
+            language={language}
+            showDecimals={userSettings.showDecimals}
+            hideBalances={hideBalances}
+          />
+        );
+      case 'list':
       default:
         return (
-          <div className="px-5 pt-12">
-            <header className="mb-6 flex justify-between items-end">
-              <div className="flex flex-col gap-4">
-                <button 
-                  onClick={() => setIsSidebarOpen(true)}
-                  className="w-10 h-10 theme-card rounded-full flex items-center justify-center mb-2 active:scale-90 transition-transform"
-                >
-                  <svg className="w-6 h-6 theme-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16m-7 6h7" /></svg>
-                </button>
-                <div>
-                  <p className="opacity-60 font-bold text-xs uppercase tracking-tight ml-1">{selectedYear}</p>
-                  <h1 className="text-4xl font-extrabold tracking-tight text-[#4A453E] capitalize">{monthName}</h1>
-                </div>
-              </div>
-              <div className="flex bg-white/50 ios-blur rounded-full p-1 shadow-sm border theme-border">
-                <button onClick={() => selectedMonth === 0 ? (setSelectedMonth(11), setSelectedYear(selectedYear - 1)) : setSelectedMonth(selectedMonth - 1)} className="p-2 theme-primary hover:bg-white rounded-full transition-all">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" /></svg>
-                </button>
-                <button onClick={() => selectedMonth === 11 ? (setSelectedMonth(0), setSelectedYear(selectedYear + 1)) : setSelectedMonth(selectedMonth + 1)} className="p-2 theme-primary hover:bg-white rounded-full transition-all">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" /></svg>
-                </button>
-              </div>
-            </header>
-
-            <div className="theme-card rounded-3xl p-6 mb-8 flex justify-between items-center group">
-              <div>
-                <div className="flex items-center gap-2 mb-0.5">
-                  <p className="text-[11px] font-bold opacity-60 uppercase">Totale Speso</p>
-                  <button 
-                    onClick={() => setHideBalances(!hideBalances)}
-                    className="text-[#D9D1C5] hover:theme-primary transition-colors"
-                  >
-                    {hideBalances ? (
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" /></svg>
-                    ) : (
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                    )}
-                  </button>
-                </div>
-                <p className="text-3xl font-bold text-[#4A453E]">
-                  {hideBalances ? '€ ••••' : `€${filteredExpenses.reduce((s, e) => s + e.amount, 0).toFixed(2)}`}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-[11px] font-bold opacity-60 uppercase ml-4 mb-2">Transazioni Recenti</h3>
-              {filteredExpenses.length === 0 ? (
-                <div className="text-center py-16 opacity-30">
-                  <p className="font-semibold italic text-sm">Nessuna operazione</p>
-                </div>
-              ) : (
-                <div className="theme-card rounded-[2rem] overflow-hidden divide-y theme-border">
-                  {filteredExpenses.map(expense => {
-                    const cat = categories.find(c => c.id === expense.categoryId);
-                    const acc = accounts.find(a => a.id === expense.accountId);
-                    return (
-                      <div key={expense.id} className="p-4 flex items-center gap-4 active:theme-sub-bg transition-colors group">
-                        <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ backgroundColor: `${cat?.color || '#eee'}15` }}>
-                          <CategoryIcon iconName={cat?.icon || 'generic'} color={cat?.color || 'var(--primary)'} className="w-5 h-5" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <h4 className="font-bold text-[15px] text-[#4A453E] flex items-center gap-1.5">
-                                {cat?.name || 'Senza Categoria'}
-                                {expense.usedLinkedCard && acc?.linkedCardName && (
-                                  <span className="flex items-center gap-0.5 theme-sub-bg px-1.5 py-0.5 rounded-full border theme-border text-[9px] theme-primary font-bold">
-                                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                                    </svg>
-                                    {acc.linkedCardName}
-                                  </span>
-                                )}
-                              </h4>
-                              <p className="text-[11px] opacity-60 font-medium">
-                                {new Date(expense.date).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
-                                {acc && !expense.usedLinkedCard && ` • ${acc.name}`}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <span className="font-bold text-[16px] text-[#4A453E]">
-                                {hideBalances ? '-€ ••' : `-€${expense.amount.toFixed(2)}`}
-                              </span>
-                              <button onClick={() => deleteExpense(expense.id)} className="opacity-0 group-hover:opacity-100 p-1 text-[#D9D1C5] hover:text-rose-400 transition-all">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
+          <ExpenseList 
+            expenses={expenses}
+            categories={categories}
+            accounts={accounts}
+            onOpenSidebar={() => setIsSidebarOpen(true)}
+            selectedMonth={selectedMonth}
+            selectedYear={selectedYear}
+            onPrevMonth={() => {
+              if (selectedMonth === 0) { setSelectedMonth(11); setSelectedYear(selectedYear - 1); }
+              else { setSelectedMonth(selectedMonth - 1); }
+            }}
+            onNextMonth={() => {
+              if (selectedMonth === 11) { setSelectedMonth(0); setSelectedYear(selectedYear + 1); }
+              else { setSelectedMonth(selectedMonth + 1); }
+            }}
+            hideBalances={hideBalances}
+            onToggleHideBalances={() => setHideBalances(!hideBalances)}
+            onNavigate={navigateTo}
+            onDeleteExpense={handleDeleteExpense}
+            language={language}
+            showDecimals={userSettings.showDecimals}
+          />
         );
     }
   };
 
+  const Fab = (
+    <div className="relative">
+      {isFabOpen && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4 animate-in fade-in slide-in-from-bottom-10 duration-300">
+          <button onClick={() => { setIsTransferFormOpen(true); setIsFabOpen(false); }} className="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl shadow-xl border theme-border whitespace-nowrap active:scale-95 transition-transform"><span className="text-sky-500 font-bold">{language === 'it' ? 'Trasferimento' : 'Transfer'}</span><div className="w-8 h-8 bg-sky-50 text-sky-500 rounded-lg flex items-center justify-center"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4-4m-4 4l4 4" /></svg></div></button>
+          <button onClick={() => { setIsIncomeFormOpen(true); setIsFabOpen(false); }} className="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl shadow-xl border theme-border whitespace-nowrap active:scale-95 transition-transform"><span className="text-emerald-500 font-bold">{language === 'it' ? 'Nuova Entrata' : 'New Income'}</span><div className="w-8 h-8 bg-emerald-50 text-emerald-500 rounded-lg flex items-center justify-center"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg></div></button>
+          <button onClick={() => { setIsFormOpen(true); setIsFabOpen(false); }} className="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl shadow-xl border theme-border whitespace-nowrap active:scale-95 transition-transform"><span className="text-rose-500 font-bold">{language === 'it' ? 'Nuova Uscita' : 'New Expense'}</span><div className="w-8 h-8 bg-rose-50 text-rose-500 rounded-lg flex items-center justify-center"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M20 12H4" /></svg></div></button>
+        </div>
+      )}
+      <button 
+        onClick={() => setIsFabOpen(!isFabOpen)}
+        className={`w-16 h-16 theme-bg-primary rounded-2xl flex items-center justify-center text-white shadow-2xl transition-all active:scale-90 z-[60] ${isFabOpen ? 'rotate-45' : ''}`}
+      >
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+      </button>
+    </div>
+  );
+
   return (
-    <Layout activeView={view} onViewChange={navigateTo}>
+    <Layout activeView={view} onViewChange={navigateTo} centerButton={Fab} language={language}>
       <Sidebar 
         isOpen={isSidebarOpen} 
         onClose={() => setIsSidebarOpen(false)} 
         onViewChange={navigateTo} 
-        currentView={view}
-        user={currentUser}
-        onLogout={handleLogout}
+        currentView={view} 
+        user={currentUser} 
+        onLogout={handleLogout} 
+        language={language}
       />
       {renderView()}
-      
-      {(view === 'accounts' || view === 'list' || view === 'export' || view === 'monthly_reports' || view === 'dashboard') && (
-        <div className="fixed bottom-24 right-6 flex flex-col items-end gap-3 z-[40]">
-          {isFabOpen && (
-            <div className="flex flex-col items-end gap-3 animate-in fade-in slide-in-from-bottom-4 duration-300">
-              <button 
-                onClick={() => { setIsIncomeFormOpen(true); setIsFabOpen(false); }}
-                className="flex items-center gap-3 bg-emerald-500 text-white px-4 py-3 rounded-2xl shadow-lg shadow-emerald-500/30 active:scale-95 transition-transform"
-              >
-                <span className="text-[13px] font-bold uppercase tracking-wider">Nuova Entrata</span>
-                <div className="w-8 h-8 flex items-center justify-center">
-                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
-                </div>
-              </button>
-
-              <button 
-                onClick={() => { setIsTransferFormOpen(true); setIsFabOpen(false); }}
-                className="flex items-center gap-3 bg-sky-400 text-white px-4 py-3 rounded-2xl shadow-lg shadow-sky-400/30 active:scale-95 transition-transform"
-              >
-                <span className="text-[13px] font-bold uppercase tracking-wider">Trasferimento</span>
-                <div className="w-8 h-8 flex items-center justify-center">
-                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
-                </div>
-              </button>
-              
-              <button 
-                onClick={() => { setIsFormOpen(true); setIsFabOpen(false); }}
-                className="flex items-center gap-3 bg-rose-400 text-white px-4 py-3 rounded-2xl shadow-lg shadow-rose-400/30 active:scale-95 transition-transform"
-              >
-                <span className="text-[13px] font-bold uppercase tracking-wider">Nuova Spesa</span>
-                <div className="w-8 h-8 flex items-center justify-center">
-                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 6v12m6-6H6" /></svg>
-                </div>
-              </button>
-            </div>
-          )}
-
-          <button 
-            onClick={() => setIsFabOpen(!isFabOpen)}
-            className={`w-14 h-14 rounded-full flex items-center justify-center shadow-xl transition-all duration-300 ${isFabOpen ? 'bg-white theme-primary rotate-45 theme-border border' : 'theme-bg-primary text-white'}`}
-          >
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 6v12m6-6H6" />
-            </svg>
-          </button>
-        </div>
-      )}
-
-      {isFormOpen && (
-        <ExpenseForm categories={categories} accounts={accounts} onSave={addExpense} onClose={() => setIsFormOpen(false)} />
-      )}
-      {isIncomeFormOpen && (
-        <IncomeForm accounts={accounts} onSave={addIncome} onClose={() => setIsIncomeFormOpen(false)} />
-      )}
-      {isTransferFormOpen && (
-        <TransferForm accounts={accounts} onSave={handleTransfer} onClose={() => setIsTransferFormOpen(false)} />
-      )}
+      {isFormOpen && <ExpenseForm categories={categories} accounts={accounts} onSave={handleSaveExpense} onClose={() => setIsFormOpen(false)} defaultAccountId={userSettings.defaultAccountId} />}
+      {isIncomeFormOpen && <IncomeForm accounts={accounts} incomeCategories={incomeCategories} onSave={handleSaveIncome} onClose={() => setIsIncomeFormOpen(false)} />}
+      {isTransferFormOpen && <TransferForm accounts={accounts} onSave={handleSaveTransfer} onClose={() => setIsTransferFormOpen(false)} />}
     </Layout>
   );
 };

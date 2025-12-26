@@ -1,28 +1,32 @@
 
 import React, { useState } from 'react';
-import { Income, Account } from '../types';
+import { Income, Account, IncomeCategory } from '../types';
+import CategoryIcon from './CategoryIcon';
 
 interface IncomeFormProps {
   accounts: Account[];
+  incomeCategories: IncomeCategory[];
   onSave: (income: Omit<Income, 'id'>) => void;
   onClose: () => void;
 }
 
-const IncomeForm: React.FC<IncomeFormProps> = ({ accounts, onSave, onClose }) => {
+const IncomeForm: React.FC<IncomeFormProps> = ({ accounts, incomeCategories, onSave, onClose }) => {
   const [formData, setFormData] = useState({
     amount: '',
     accountId: accounts[0]?.id || '',
+    categoryId: incomeCategories[0]?.id || '',
     date: new Date().toISOString().split('T')[0],
     notes: ''
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.amount || !formData.accountId) return;
+    if (!formData.amount || !formData.accountId || !formData.categoryId) return;
     
     onSave({
       amount: parseFloat(formData.amount),
       accountId: formData.accountId,
+      categoryId: formData.categoryId,
       date: formData.date,
       notes: formData.notes
     });
@@ -55,6 +59,27 @@ const IncomeForm: React.FC<IncomeFormProps> = ({ accounts, onSave, onClose }) =>
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
               />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-[#918B82] uppercase mb-3 px-1">Categoria Entrata</label>
+            <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
+              {incomeCategories.map(c => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setFormData({...formData, categoryId: c.id})}
+                  className="flex flex-col items-center gap-2 min-w-[70px]"
+                >
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${formData.categoryId === c.id ? 'bg-emerald-500 text-white shadow-md' : 'bg-white border border-[#EBE4D8] text-emerald-500'}`}>
+                    <CategoryIcon iconName={c.icon} color={formData.categoryId === c.id ? 'white' : c.color} className="w-6 h-6" />
+                  </div>
+                  <span className={`text-[10px] font-bold uppercase truncate w-full text-center ${formData.categoryId === c.id ? 'text-emerald-700' : 'text-[#918B82]'}`}>
+                    {c.name}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
 

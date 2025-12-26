@@ -9,14 +9,34 @@ export enum Repeatability {
   YEARLY = 'Annuale'
 }
 
+export type Language = 'it' | 'en';
+export type TextSize = 'small' | 'medium' | 'large';
+
+export interface AppSettings {
+  monthlyBudget: number;
+  firstDayOfMonth: number;
+  defaultAccountId: string;
+  showDecimals: boolean;
+  textSize: TextSize;
+}
+
 export interface User {
   id: string;
   name: string;
   email: string;
   password?: string;
+  language?: Language;
+  settings?: AppSettings;
 }
 
 export interface Category {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+}
+
+export interface IncomeCategory {
   id: string;
   name: string;
   icon: string;
@@ -50,8 +70,9 @@ export interface Income {
   id: string;
   amount: number;
   accountId: string;
+  categoryId: string;
   date: string;
   notes: string;
 }
 
-export type ViewType = 'list' | 'dashboard' | 'categories' | 'accounts' | 'settings' | 'export' | 'monthly_reports' | 'auth' | 'profile' | 'security';
+export type ViewType = 'list' | 'dashboard' | 'categories' | 'accounts' | 'settings' | 'export' | 'monthly_reports' | 'auth' | 'profile' | 'security' | 'financial_analysis' | 'income_list' | 'income_categories' | 'ai_advisor' | 'search';

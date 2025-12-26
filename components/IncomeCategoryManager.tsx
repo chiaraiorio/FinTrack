@@ -1,22 +1,21 @@
 
 import React, { useState, useEffect } from 'react';
-import { Category } from '../types';
+import { IncomeCategory } from '../types';
 import CategoryIcon from './CategoryIcon';
 import { CATEGORY_ICON_PATHS } from '../constants';
 
-interface CategoryManagerProps {
-  categories: Category[];
-  onAdd: (cat: Omit<Category, 'id'>) => void;
-  onUpdate: (cat: Category) => void;
+interface IncomeCategoryManagerProps {
+  categories: IncomeCategory[];
+  onAdd: (cat: Omit<IncomeCategory, 'id'>) => void;
+  onUpdate: (cat: IncomeCategory) => void;
   onDelete: (id: string) => void;
   onBack: () => void;
-  onOpenSidebar: () => void;
 }
 
-const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onAdd, onUpdate, onDelete, onBack, onOpenSidebar }) => {
+const IncomeCategoryManager: React.FC<IncomeCategoryManagerProps> = ({ categories, onAdd, onUpdate, onDelete, onBack }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
-  const [formState, setFormState] = useState({ name: '', icon: 'tag', color: '#8E7C68' });
+  const [formState, setFormState] = useState({ name: '', icon: 'tag', color: '#10B981' });
 
   useEffect(() => {
     if (editingCategoryId) {
@@ -42,13 +41,9 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onAdd, on
   };
 
   const resetForm = () => {
-    setFormState({ name: '', icon: 'tag', color: '#8E7C68' });
+    setFormState({ name: '', icon: 'tag', color: '#10B981' });
     setEditingCategoryId(null);
     setShowForm(false);
-  };
-
-  const handleEditClick = (cat: Category) => {
-    setEditingCategoryId(cat.id);
   };
 
   const iconOptions = Object.keys(CATEGORY_ICON_PATHS);
@@ -56,25 +51,16 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onAdd, on
   return (
     <div className="p-6">
       <header className="flex flex-col gap-4 mb-8">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-start items-center">
           <button 
             onClick={onBack}
-            className="flex items-center gap-1 theme-primary -ml-2 active:opacity-50 transition-opacity"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" />
-            </svg>
-            <span className="text-lg font-medium">Indietro</span>
-          </button>
-          <button 
-            onClick={onOpenSidebar}
             className="w-10 h-10 theme-card rounded-full flex items-center justify-center active:scale-90 transition-transform"
           >
-            <svg className="w-6 h-6 theme-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16m-7 6h7" /></svg>
+            <svg className="w-6 h-6 theme-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" /></svg>
           </button>
         </div>
-        <div className="flex justify-between items-end mt-2">
-          <h1 className="text-4xl font-extrabold tracking-tight text-[#4A453E]">Categorie</h1>
+        <div className="flex justify-between items-end">
+          <h1 className="text-3xl font-extrabold tracking-tight text-[#4A453E]">Categorie Entrate</h1>
           <button 
             onClick={() => { if(showForm) resetForm(); else setShowForm(true); }}
             className="theme-bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg active:scale-95 transition-transform"
@@ -91,13 +77,13 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onAdd, on
           </h2>
           
           <div>
-            <label className="block text-xs font-semibold opacity-60 uppercase mb-1">Nome Categoria</label>
+            <label className="block text-xs font-semibold opacity-60 uppercase mb-1">Nome</label>
             <input 
               type="text" 
-              className="w-full px-4 py-3 theme-sub-bg rounded-xl border-none focus:ring-2 focus:ring-current theme-primary placeholder:text-[#D9D1C5] font-medium"
+              className="w-full px-4 py-3 theme-sub-bg rounded-xl border-none focus:ring-2 focus:ring-current theme-primary font-medium"
               value={formState.name}
               onChange={e => setFormState({...formState, name: e.target.value})}
-              placeholder="Esempio: Palestra, Affitto..."
+              placeholder="Esempio: Stipendio, Bonus..."
               autoFocus
             />
           </div>
@@ -110,7 +96,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onAdd, on
                   key={iconKey}
                   type="button"
                   onClick={() => setFormState({...formState, icon: iconKey})}
-                  className={`aspect-square rounded-xl flex items-center justify-center border transition-all ${formState.icon === iconKey ? 'theme-bg-primary border-transparent text-white shadow-md scale-105' : 'theme-sub-bg theme-border theme-primary hover:bg-white'}`}
+                  className={`aspect-square rounded-xl flex items-center justify-center border transition-all ${formState.icon === iconKey ? 'bg-emerald-500 border-transparent text-white shadow-md scale-105' : 'theme-sub-bg theme-border theme-primary hover:bg-white'}`}
                 >
                   <CategoryIcon iconName={iconKey} color={formState.icon === iconKey ? 'white' : 'var(--primary)'} className="w-5 h-5" />
                 </button>
@@ -119,7 +105,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onAdd, on
           </div>
           
           <button type="submit" className="w-full py-4 theme-bg-primary text-white rounded-xl font-bold shadow-md active:scale-95 transition-transform">
-            {editingCategoryId ? 'Aggiorna Categoria' : 'Salva Categoria'}
+            Salva
           </button>
         </form>
       )}
@@ -128,20 +114,16 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onAdd, on
         {categories.map(c => (
           <div key={c.id} className="bg-white p-4 rounded-[1.5rem] flex items-center justify-between border theme-border shadow-sm group active:theme-sub-bg transition-colors">
             <div className="flex items-center gap-4">
-              <div 
-                className="w-12 h-12 rounded-[1.1rem] flex items-center justify-center shadow-inner theme-sub-bg"
-              >
-                <CategoryIcon iconName={c.icon} color="var(--primary)" className="w-6 h-6" />
+              <div className="w-12 h-12 rounded-[1.1rem] flex items-center justify-center theme-sub-bg">
+                <CategoryIcon iconName={c.icon} color="#10B981" className="w-6 h-6" />
               </div>
-              <div>
-                <h3 className="font-bold text-[#4A453E] text-[15px]">{c.name}</h3>
-              </div>
+              <h3 className="font-bold text-[#4A453E] text-[15px]">{c.name}</h3>
             </div>
             
             <div className="flex items-center gap-1">
               <button 
-                onClick={() => handleEditClick(c)}
-                className="p-2 text-[#B8B0A5] hover:theme-primary active:scale-90 transition-all opacity-0 group-hover:opacity-100"
+                onClick={() => setEditingCategoryId(c.id)}
+                className="p-2 text-[#B8B0A5] hover:theme-primary transition-all opacity-0 group-hover:opacity-100"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -149,7 +131,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onAdd, on
               </button>
               <button 
                 onClick={() => { if(window.confirm('Eliminare questa categoria?')) onDelete(c.id); }}
-                className="p-2 text-[#D9D1C5] hover:text-rose-500 active:scale-90 transition-all"
+                className="p-2 text-[#D9D1C5] hover:text-rose-500 transition-all"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -164,4 +146,4 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onAdd, on
   );
 };
 
-export default CategoryManager;
+export default IncomeCategoryManager;

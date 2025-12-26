@@ -8,6 +8,12 @@ interface AuthProps {
 
 type AuthStep = 'login' | 'register' | 'verify';
 
+interface EmailSimulation {
+  to: string;
+  code: string;
+  show: boolean;
+}
+
 const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   const [step, setStep] = useState<AuthStep>('login');
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
@@ -17,6 +23,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [generatedCode, setGeneratedCode] = useState('');
   const [countdown, setCountdown] = useState(0);
+  const [emailNotice, setEmailNotice] = useState<EmailSimulation>({ to: '', code: '', show: false });
 
   useEffect(() => {
     let timer: any;
@@ -31,8 +38,16 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   };
 
   const simulateEmailSend = (email: string, code: string) => {
+    // Mostra la notifica simulata nell'UI
+    setEmailNotice({ to: email, code, show: true });
+    
+    // Log di debug in console
     console.log(`%c[EMAIL SIMULATION]`, 'color: #10B981; font-weight: bold;', `Inviata email a ${email} con codice: ${code}`);
-    // In un'app reale qui chiameremmo un servizio come SendGrid o AWS SES
+    
+    // Nascondi la notifica dopo 10 secondi
+    setTimeout(() => {
+      setEmailNotice(prev => ({ ...prev, show: false }));
+    }, 10000);
   };
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -51,14 +66,13 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
           setGeneratedCode(code);
           simulateEmailSend(user.email, code);
           setStep('verify');
-          setIsLoading(false);
         } else {
           onLogin(user);
         }
       } else {
         setError('Credenziali non valide. Controlla email e password.');
-        setIsLoading(false);
       }
+      setIsLoading(false);
     } else if (step === 'register') {
       if (!formData.name || !formData.email || !formData.password) {
         setError('Tutti i campi sono obbligatori.');
@@ -115,6 +129,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         localStorage.setItem('registered_users', JSON.stringify(updatedUsers));
       }
 
+      setEmailNotice(prev => ({ ...prev, show: false }));
       onLogin(user);
     } else {
       setError('Codice non corretto. Riprova.');
@@ -130,7 +145,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
     newOtp[index] = value;
     setOtp(newOtp);
 
-    // Auto-focus next input
     if (value && index < 5) {
       const nextInput = document.getElementById(`otp-${index + 1}`);
       nextInput?.focus();
@@ -147,7 +161,31 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2] flex flex-col items-center justify-center px-6 animate-in fade-in duration-500">
+    <div className="min-h-screen bg-[#FAF7F2] flex flex-col items-center justify-center px-6 animate-in fade-in duration-500 relative overflow-hidden">
+      
+      {/* EMAIL NOTIFICATION SIMULATOR */}
+      {emailNotice.show && (
+        <div className="fixed top-6 left-6 right-6 z-[200] animate-in slide-in-from-top-10 duration-500">
+          <div className="max-w-sm mx-auto bg-white rounded-3xl shadow-2xl border-l-4 border-emerald-500 p-5 flex gap-4 items-start ring-1 ring-black/5">
+            <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-500 shrink-0">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Posta in Arrivo</span>
+                <button onClick={() => setEmailNotice(prev => ({ ...prev, show: false }))} className="text-[#D9D1C5]">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+              <p className="text-[13px] font-black text-[#4A453E]">FinTrack Auth</p>
+              <p className="text-[12px] text-[#918B82] leading-tight mt-0.5">
+                Il tuo codice di verifica è: <span className="text-emerald-600 font-black text-[14px] bg-emerald-50 px-1.5 py-0.5 rounded-lg">{emailNotice.code}</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="w-full max-w-sm space-y-10">
         
         <div className="text-center space-y-4">
@@ -230,6 +268,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                 <p className="text-xs text-[#918B82] font-medium leading-relaxed">
                   Abbiamo inviato un codice a 6 cifre a <br/><span className="theme-primary font-bold">{formData.email}</span>
                 </p>
+                <p className="text-[10px] font-bold text-emerald-600 bg-emerald-50 py-1 px-3 rounded-full inline-block mt-2">Controlla le notifiche in alto!</p>
               </div>
 
               {error && <div className="bg-rose-50 text-rose-500 text-[11px] font-bold p-3 rounded-2xl text-center border border-rose-100">{error}</div>}
@@ -272,7 +311,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                   {countdown > 0 ? `Invia di nuovo tra ${countdown}s` : 'Non hai ricevuto nulla? Reinvia'}
                 </button>
                 <button 
-                  onClick={() => { setStep('login'); setOtp(['','','','','','']); setError(''); }}
+                  onClick={() => { setStep('login'); setOtp(['','','','','','']); setError(''); setEmailNotice(prev => ({ ...prev, show: false })); }}
                   className="block mx-auto text-[11px] font-bold text-[#918B82] uppercase"
                 >
                   Torna indietro

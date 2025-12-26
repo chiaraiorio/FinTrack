@@ -27,6 +27,7 @@ export interface User {
   password?: string;
   language?: Language;
   settings?: AppSettings;
+  isVerified?: boolean;
 }
 
 export interface Category {

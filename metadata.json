@@ -1,5 +1,11 @@
 {
   "name": "FinTrack",
-  "description": "Un'app di monitoraggio spese intuitiva e minimalista con dashboard analitiche, gestione categorie e conti, integrata con analisi intelligenti.",
-  "requestFramePermissions": []
+  "short_name": "FinTrack",
+  "description": "Monitoraggio spese intelligente con monogramma FT e analisi Gemini.",
+  "theme_color": "#8E7C68",
+  "background_color": "#FAF7F2",
+  "display": "standalone",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
 }

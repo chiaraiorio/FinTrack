@@ -100,6 +100,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeView, onViewChange, cen
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
           active={activeView === 'income_list'} 
           onClick={() => onViewChange('income_list')} 
+          activeColor="text-emerald-500"
         />
 
         <NavButton 
@@ -107,14 +108,15 @@ const Layout: React.FC<LayoutProps> = ({ children, activeView, onViewChange, cen
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>}
           active={activeView === 'list'} 
           onClick={() => onViewChange('list')} 
+          activeColor="text-red-500"
         />
       </nav>
     </div>
   );
 };
 
-const NavButton: React.FC<{ label: string; icon: React.ReactNode; active: boolean; onClick: () => void }> = ({ label, icon, active, onClick }) => (
-  <button onClick={onClick} className={`flex flex-col items-center gap-1 flex-1 transition-all duration-300 ${active ? 'theme-primary' : 'text-[#B8B0A5]'}`}>
+const NavButton: React.FC<{ label: string; icon: React.ReactNode; active: boolean; onClick: () => void; activeColor?: string }> = ({ label, icon, active, onClick, activeColor = 'theme-primary' }) => (
+  <button onClick={onClick} className={`flex flex-col items-center gap-1 flex-1 transition-all duration-300 ${active ? activeColor : 'text-[#B8B0A5]'}`}>
     <div className={`transition-transform duration-300 ${active ? 'scale-110' : 'scale-100'}`}>{icon}</div>
     <span className={`text-[8px] font-black uppercase tracking-widest ${active ? 'opacity-100' : 'opacity-60'}`}>{label}</span>
   </button>

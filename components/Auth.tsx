@@ -16,7 +16,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
     e.preventDefault();
     setError('');
     
-    // Normalizzazione: email minuscola e senza spazi bianchi
     const normalizedEmail = formData.email.trim().toLowerCase();
     const trimmedPassword = formData.password;
     const trimmedName = formData.name.trim();
@@ -35,7 +34,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
     }
 
     if (isRegister) {
-      // Verifica se l'utente esiste già (usando email normalizzata)
       if (users.find(u => u.email.toLowerCase() === normalizedEmail)) {
         setError('Questa email è già registrata.');
         return;
@@ -51,12 +49,9 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
       const updatedUsers = [...users, newUser];
       localStorage.setItem(storageKey, JSON.stringify(updatedUsers));
-      
-      // Salviamo anche come ultimo utente loggato
       localStorage.setItem('current_user', JSON.stringify(newUser));
       onLogin(newUser);
     } else {
-      // Login con email normalizzata
       const user = users.find(u => 
         u.email.toLowerCase() === normalizedEmail && 
         u.password === trimmedPassword
@@ -64,6 +59,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
       if (user) {
         localStorage.setItem('current_user', JSON.stringify(user));
+        // Forza persistenza immediata per evitare problemi di race condition
         onLogin(user);
       } else {
         setError('Email o password errati. Verifica i dati inseriti.');

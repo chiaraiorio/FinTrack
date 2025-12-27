@@ -2,29 +2,24 @@
 import { Category, Account, Repeatability, IncomeCategory } from './types';
 
 export const INITIAL_CATEGORIES: Category[] = [
-  // Added updatedAt property to satisfy Category type
-  { id: '1', name: 'Spesa', icon: 'cart', color: '#8E7C68', updatedAt: 0 },
-  { id: '2', name: 'Trasporti', icon: 'car', color: '#8E7C68', updatedAt: 0 },
-  { id: '3', name: 'Casa', icon: 'house', color: '#8E7C68', updatedAt: 0 },
-  { id: '4', name: 'Ristoranti', icon: 'fork.knife', color: '#8E7C68', updatedAt: 0 },
-  { id: '5', name: 'Svago', icon: 'play.tv', color: '#8E7C68', updatedAt: 0 },
-  { id: '6', name: 'Salute', icon: 'heart', color: '#8E7C68', updatedAt: 0 },
+  { id: '1', name: 'Spesa', icon: 'cart', color: '#EF4444', updatedAt: Date.now() },
+  { id: '2', name: 'Trasporti', icon: 'car', color: '#EF4444', updatedAt: Date.now() },
+  { id: '3', name: 'Casa', icon: 'house', color: '#EF4444', updatedAt: Date.now() },
+  { id: '4', name: 'Ristoranti', icon: 'fork.knife', color: '#EF4444', updatedAt: Date.now() },
+  { id: '5', name: 'Svago', icon: 'play.tv', color: '#EF4444', updatedAt: Date.now() },
+  { id: '6', name: 'Salute', icon: 'heart', color: '#EF4444', updatedAt: Date.now() },
 ];
 
 export const INITIAL_INCOME_CATEGORIES: IncomeCategory[] = [
-  // Added updatedAt property to satisfy IncomeCategory type
-  { id: 'inc1', name: 'Stipendio', icon: 'briefcase', color: '#10B981', updatedAt: 0 },
-  { id: 'inc2', name: 'Regalo', icon: 'gift', color: '#8B5CF6', updatedAt: 0 },
-  { id: 'inc3', name: 'Rimborsi', icon: 'tag', color: '#3B82F6', updatedAt: 0 },
-  { id: 'inc4', name: 'Altro', icon: 'generic', color: '#6B7280', updatedAt: 0 },
+  { id: 'inc1', name: 'Stipendio', icon: 'briefcase', color: '#10B981', updatedAt: Date.now() },
+  { id: 'inc2', name: 'Regalo', icon: 'gift', color: '#8B5CF6', updatedAt: Date.now() },
+  { id: 'inc3', name: 'Rimborsi', icon: 'tag', color: '#3B82F6', updatedAt: Date.now() },
+  { id: 'inc4', name: 'Altro', icon: 'generic', color: '#6B7280', updatedAt: Date.now() },
 ];
 
 export const INITIAL_ACCOUNTS: Account[] = [
-  // Added updatedAt property to satisfy Account type
-  { id: 'acc1', name: 'Banca Intesa', balance: 1500, type: 'Banca', color: '#3B82F6', cards: [], updatedAt: 0 },
-  { id: 'acc2', name: 'UniCredit', balance: 500, type: 'Banca', color: '#8B5CF6', cards: [], updatedAt: 0 },
-  { id: 'acc3', name: 'Revolut', balance: 3000, type: 'Banca', color: '#10B981', cards: [], updatedAt: 0 },
-  { id: 'acc4', name: 'Portafoglio', balance: 150, type: 'Contanti', color: '#F59E0B', cards: [], updatedAt: 0 },
+  { id: 'acc1', name: 'Conto Corrente', balance: 0, type: 'Banca', color: '#3B82F6', cards: [], updatedAt: Date.now() },
+  { id: 'acc4', name: 'Portafoglio', balance: 0, type: 'Contanti', color: '#F59E0B', cards: [], updatedAt: Date.now() },
 ];
 
 export const REPEAT_OPTIONS = Object.values(Repeatability);

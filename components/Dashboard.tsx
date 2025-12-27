@@ -73,8 +73,9 @@ const Dashboard: React.FC<DashboardProps> = ({
   const totalExpenses = useMemo(() => currentMonthExpenses.reduce((s, e) => s + e.amount, 0), [currentMonthExpenses]);
   const totalIncomes = useMemo(() => currentMonthIncomes.reduce((s, i) => s + i.amount, 0), [currentMonthIncomes]);
   
-  const totalLiquidity = useMemo(() => 
-    accounts.reduce((s, a) => s + a.balance + a.cards.reduce((cs, c) => cs + c.balance, 0), 0), 
+  // Explicitly type totalLiquidity to resolve 'unknown' inference in some environments
+  const totalLiquidity: number = useMemo(() => 
+    accounts.reduce((s: number, a: Account) => s + a.balance + a.cards.reduce((cs: number, c) => cs + c.balance, 0), 0), 
   [accounts]);
 
   // Accounts breakdown for current month
@@ -195,8 +196,8 @@ const Dashboard: React.FC<DashboardProps> = ({
           >
             <div className="text-center relative">
               <p className="text-[10px] font-black opacity-40 uppercase tracking-widest mb-1">Patrimonio Totale</p>
-              {/* Fix toLocaleString on line 246 by using Intl.NumberFormat */}
-              <p className="text-4xl font-black text-[#4A453E] tracking-tighter">€{formatVal(totalLiquidity)}</p>
+              {/* Added explicit cast to number to resolve 'unknown' error */}
+              <p className="text-4xl font-black text-[#4A453E] tracking-tighter">€{formatVal(totalLiquidity as number)}</p>
               <div className={`absolute right-0 top-1/2 -translate-y-1/2 transition-transform duration-300 ${isAssetsExpanded ? 'rotate-180' : ''}`}>
                 <svg className="w-5 h-5 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
               </div>
@@ -204,7 +205,8 @@ const Dashboard: React.FC<DashboardProps> = ({
             {isAssetsExpanded && (
               <div className="mt-8 pt-6 border-t theme-border space-y-4 animate-in slide-in-from-top-4 duration-300">
                 {accounts.map(acc => {
-                  const accTotal = acc.balance + acc.cards.reduce((s, c) => s + c.balance, 0);
+                  // Explicitly type accTotal as number to resolve 'unknown' error
+                  const accTotal: number = acc.balance + acc.cards.reduce((s: number, c) => s + c.balance, 0);
                   return (
                     <div key={acc.id} className="flex items-center justify-between group">
                       <div className="flex items-center gap-3">
@@ -216,8 +218,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                           <p className="text-[9px] font-bold opacity-30 uppercase">{acc.type}</p>
                         </div>
                       </div>
-                      {/* Fix toLocaleString on line 274 by using Intl.NumberFormat */}
-                      <p className="text-sm font-black text-[#4A453E]">€{formatVal(accTotal)}</p>
+                      {/* Added explicit cast to number to resolve 'unknown' error */}
+                      <p className="text-sm font-black text-[#4A453E]">€{formatVal(accTotal as number)}</p>
                     </div>
                   );
                 })}

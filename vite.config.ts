@@ -4,13 +4,17 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  // Rimuoviamo base: './' perché Vercel gestisce meglio i path assoluti di default
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
+    sourcemap: false,
+    minify: 'terser',
   },
   define: {
-    // Questo permette all'app di accedere a process.env.API_KEY come richiesto dalle linee guida
+    // Inietta la variabile d'ambiente process.env.API_KEY per il client
     'process.env.API_KEY': JSON.stringify(process.env.API_KEY)
+  },
+  server: {
+    historyApiFallback: true,
   }
 });

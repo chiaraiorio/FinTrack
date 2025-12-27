@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Expense, Income, Category, Account, ViewType, SavingsJar, IncomeCategory } from '../types';
 import CategoryIcon from './CategoryIcon';
 
@@ -32,7 +32,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [isExpensesExpanded, setIsExpensesExpanded] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
 
-  // Widget visibility state
+  // Widget visibility state salvata localmente
   const [visibleWidgets, setVisibleWidgets] = useState(() => {
     const saved = localStorage.getItem('dash_widgets');
     return saved ? JSON.parse(saved) : {
@@ -55,7 +55,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const realExpenses = useMemo(() => expenses.filter(e => !e.isInternalTransfer), [expenses]);
   const realIncomes = useMemo(() => incomes.filter(i => !i.isInternalTransfer), [incomes]);
 
-  // Current month data
+  // Dati mese corrente
   const currentMonthExpenses = useMemo(() => 
     realExpenses.filter(e => {
       const d = new Date(e.date);
@@ -73,12 +73,11 @@ const Dashboard: React.FC<DashboardProps> = ({
   const totalExpenses = useMemo(() => currentMonthExpenses.reduce((s, e) => s + e.amount, 0), [currentMonthExpenses]);
   const totalIncomes = useMemo(() => currentMonthIncomes.reduce((s, i) => s + i.amount, 0), [currentMonthIncomes]);
   
-  // Explicitly type totalLiquidity to resolve 'unknown' inference in some environments
   const totalLiquidity: number = useMemo(() => 
     accounts.reduce((s: number, a: Account) => s + a.balance + a.cards.reduce((cs: number, c) => cs + c.balance, 0), 0), 
   [accounts]);
 
-  // Accounts breakdown for current month
+  // Breakdown per conti (mese corrente)
   const accountExpenseBreakdown = useMemo(() => {
     const breakdown: Record<string, number> = {};
     currentMonthExpenses.forEach(e => {
@@ -95,6 +94,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     return breakdown;
   }, [currentMonthIncomes]);
 
+  // Dati Grafico Categorie
   const expenseCategoryData = useMemo(() => {
     const data: Record<string, { amount: number, icon: string, color: string }> = {};
     currentMonthExpenses.forEach(e => {
@@ -110,6 +110,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       .sort((a, b) => b.amount - a.amount);
   }, [currentMonthExpenses, categories]);
 
+  // Dati Trend 6 Mesi
   const chartData = useMemo(() => {
     const data: Record<string, { total: number; income: number }> = {};
     for(let i=5; i>=0; i--) {
@@ -128,6 +129,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     return Object.entries(data).map(([name, vals]) => ({ name, ...vals }));
   }, [realExpenses, realIncomes, now]);
 
+  // Dati Analisi Giornaliera
   const dailyData = useMemo(() => {
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
     const data = Array.from({ length: daysInMonth }, (_, i) => ({
@@ -145,7 +147,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     setVisibleWidgets((prev: any) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  // Helper for formatting currency to avoid toLocaleString typing issues in some environments
   const formatVal = (val: number) => new Intl.NumberFormat('it-IT').format(val);
 
   return (
@@ -158,23 +159,27 @@ const Dashboard: React.FC<DashboardProps> = ({
           <svg className="w-6 h-6 theme-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
         </button>
         <div className="flex-1 flex justify-end items-center gap-2">
-          <button onClick={() => setShowConfig(!showConfig)} className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${showConfig ? 'theme-bg-primary text-white' : 'theme-card text-primary'}`}>
-             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+          <button 
+            onClick={() => setShowConfig(!showConfig)} 
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${showConfig ? 'theme-bg-primary text-white' : 'theme-card text-primary'}`}
+          >
+             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
           </button>
-          <h1 className="text-xl font-black text-[#4A453E] tracking-tight">FinTrack</h1>
+          <h1 className="text-xl font-black text-[#4A453E] tracking-tight">Home</h1>
         </div>
       </header>
 
+      {/* MENU PERSONALIZZAZIONE WIDGET */}
       {showConfig && (
         <section className="bg-white rounded-3xl p-6 border theme-border shadow-md animate-in slide-in-from-top-4 duration-300">
-          <h3 className="text-[10px] font-black opacity-40 uppercase mb-4 tracking-widest">Personalizza Dashboard</h3>
+          <h3 className="text-[10px] font-black opacity-40 uppercase mb-4 tracking-widest">Personalizza Home</h3>
           <div className="grid grid-cols-2 gap-2">
             {[
               { id: 'assets', label: 'Patrimonio' },
-              { id: 'summary', label: 'Riepilogo' },
+              { id: 'summary', label: 'Entrate/Uscite' },
               { id: 'categoryPie', label: 'Categorie' },
               { id: 'monthlyTrend', label: 'Trend Mese' },
-              { id: 'dailyTrend', label: 'Spese Giorno' },
+              { id: 'dailyTrend', label: 'Analisi Giorno' },
             ].map(w => (
               <button 
                 key={w.id} 
@@ -188,6 +193,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         </section>
       )}
 
+      {/* WIDGET PATRIMONIO ESPANDIBILE */}
       {visibleWidgets.assets && (
         <section className="space-y-4">
           <div 
@@ -196,8 +202,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           >
             <div className="text-center relative">
               <p className="text-[10px] font-black opacity-40 uppercase tracking-widest mb-1">Patrimonio Totale</p>
-              {/* Added explicit cast to number to resolve 'unknown' error */}
-              <p className="text-4xl font-black text-[#4A453E] tracking-tighter">€{formatVal(totalLiquidity as number)}</p>
+              <p className="text-4xl font-black text-[#4A453E] tracking-tighter">€{formatVal(totalLiquidity)}</p>
               <div className={`absolute right-0 top-1/2 -translate-y-1/2 transition-transform duration-300 ${isAssetsExpanded ? 'rotate-180' : ''}`}>
                 <svg className="w-5 h-5 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
               </div>
@@ -205,7 +210,6 @@ const Dashboard: React.FC<DashboardProps> = ({
             {isAssetsExpanded && (
               <div className="mt-8 pt-6 border-t theme-border space-y-4 animate-in slide-in-from-top-4 duration-300">
                 {accounts.map(acc => {
-                  // Explicitly type accTotal as number to resolve 'unknown' error
                   const accTotal: number = acc.balance + acc.cards.reduce((s: number, c) => s + c.balance, 0);
                   return (
                     <div key={acc.id} className="flex items-center justify-between group">
@@ -218,8 +222,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           <p className="text-[9px] font-bold opacity-30 uppercase">{acc.type}</p>
                         </div>
                       </div>
-                      {/* Added explicit cast to number to resolve 'unknown' error */}
-                      <p className="text-sm font-black text-[#4A453E]">€{formatVal(accTotal as number)}</p>
+                      <p className="text-sm font-black text-[#4A453E]">€{formatVal(accTotal)}</p>
                     </div>
                   );
                 })}
@@ -229,27 +232,29 @@ const Dashboard: React.FC<DashboardProps> = ({
         </section>
       )}
 
+      {/* WIDGET RIEPILOGO ESPANDIBILE */}
       {visibleWidgets.summary && (
         <section className="grid grid-cols-1 gap-4">
+          {/* ENTRATE ESPANDIBILI */}
           <div 
             onClick={() => setIsIncomesExpanded(!isIncomesExpanded)}
-            className={`bg-emerald-50 rounded-[2rem] p-5 border border-emerald-100 transition-all duration-300 cursor-pointer ${isIncomesExpanded ? 'pb-8' : ''}`}
+            className={`bg-emerald-50 rounded-[2.5rem] p-6 border border-emerald-100 transition-all duration-300 cursor-pointer ${isIncomesExpanded ? 'pb-8' : ''}`}
           >
              <div className="flex justify-between items-center mb-2">
-               <p className="text-[9px] font-black text-emerald-800 opacity-60 uppercase">Entrate {now.toLocaleString('it-IT', { month: 'long' })}</p>
+               <p className="text-[9px] font-black text-emerald-800 opacity-60 uppercase tracking-widest">Entrate {now.toLocaleString('it-IT', { month: 'long' })}</p>
                <div className={`transition-transform duration-300 ${isIncomesExpanded ? 'rotate-180' : ''}`}>
                   <svg className="w-4 h-4 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
                </div>
              </div>
-             <p className="text-2xl font-black text-emerald-600">€{formatVal(totalIncomes)}</p>
+             <p className="text-3xl font-black text-emerald-600">€{formatVal(totalIncomes)}</p>
              
              {isIncomesExpanded && (
-               <div className="mt-4 pt-4 border-t border-emerald-100 space-y-3 animate-in fade-in duration-300">
+               <div className="mt-6 pt-4 border-t border-emerald-200/50 space-y-3 animate-in fade-in duration-300">
                   {Object.entries(accountIncomeBreakdown).map(([accId, amount]) => {
                     const acc = accounts.find(a => a.id === accId);
                     return (
                       <div key={accId} className="flex justify-between items-center">
-                        <span className="text-[10px] font-black text-emerald-800 opacity-50 uppercase">{acc?.name || 'Altro'}</span>
+                        <span className="text-[10px] font-black text-emerald-800/70 uppercase">{acc?.name || 'Altro'}</span>
                         <span className="text-xs font-black text-emerald-600">€{formatVal(amount)}</span>
                       </div>
                     );
@@ -259,25 +264,26 @@ const Dashboard: React.FC<DashboardProps> = ({
              )}
           </div>
 
+          {/* USCITE ESPANDIBILI */}
           <div 
             onClick={() => setIsExpensesExpanded(!isExpensesExpanded)}
-            className={`bg-rose-50 rounded-[2rem] p-5 border border-rose-100 transition-all duration-300 cursor-pointer ${isExpensesExpanded ? 'pb-8' : ''}`}
+            className={`bg-rose-50 rounded-[2.5rem] p-6 border border-rose-100 transition-all duration-300 cursor-pointer ${isExpensesExpanded ? 'pb-8' : ''}`}
           >
              <div className="flex justify-between items-center mb-2">
-               <p className="text-[9px] font-black text-rose-800 opacity-60 uppercase">Uscite {now.toLocaleString('it-IT', { month: 'long' })}</p>
+               <p className="text-[9px] font-black text-rose-800 opacity-60 uppercase tracking-widest">Uscite {now.toLocaleString('it-IT', { month: 'long' })}</p>
                <div className={`transition-transform duration-300 ${isExpensesExpanded ? 'rotate-180' : ''}`}>
                   <svg className="w-4 h-4 text-rose-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
                </div>
              </div>
-             <p className="text-2xl font-black text-rose-500">€{formatVal(totalExpenses)}</p>
+             <p className="text-3xl font-black text-rose-500">€{formatVal(totalExpenses)}</p>
              
              {isExpensesExpanded && (
-               <div className="mt-4 pt-4 border-t border-rose-100 space-y-3 animate-in fade-in duration-300">
+               <div className="mt-6 pt-4 border-t border-rose-200/50 space-y-3 animate-in fade-in duration-300">
                   {Object.entries(accountExpenseBreakdown).map(([accId, amount]) => {
                     const acc = accounts.find(a => a.id === accId);
                     return (
                       <div key={accId} className="flex justify-between items-center">
-                        <span className="text-[10px] font-black text-rose-800 opacity-50 uppercase">{acc?.name || 'Altro'}</span>
+                        <span className="text-[10px] font-black text-rose-800/70 uppercase">{acc?.name || 'Altro'}</span>
                         <span className="text-xs font-black text-rose-500">€{formatVal(amount)}</span>
                       </div>
                     );
@@ -289,6 +295,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         </section>
       )}
 
+      {/* GRAFICO CATEGORIE */}
       {visibleWidgets.categoryPie && expenseCategoryData.length > 0 && (
         <section className="bg-white rounded-[2.5rem] p-6 border theme-border shadow-sm">
           <h3 className="text-[10px] font-black opacity-40 uppercase mb-4 tracking-widest">Spese per Categoria</h3>
@@ -309,7 +316,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => `€${formatVal(value)}`} />
+                  {/* Fixed TypeScript error: changed (value: number) to (value: any) and added Number() casting to handle 'unknown' type from Recharts */}
+                  <Tooltip formatter={(value: any) => `€${formatVal(Number(value))}`} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -326,6 +334,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         </section>
       )}
 
+      {/* GRAFICO ANALISI GIORNALIERA */}
       {visibleWidgets.dailyTrend && dailyData.some(d => d.amount > 0) && (
         <div className="bg-white rounded-[2.5rem] p-6 border theme-border shadow-sm">
           <h3 className="text-[10px] font-black opacity-40 uppercase mb-6 tracking-widest">Analisi Giornaliera ({now.toLocaleString('it-IT', { month: 'long' })})</h3>
@@ -333,7 +342,8 @@ const Dashboard: React.FC<DashboardProps> = ({
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dailyData}>
                 <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#918B82', fontSize: 9, fontWeight: 900}} interval={2} />
-                <Tooltip cursor={{fill: '#F1EBE3'}} formatter={(value: number) => `€${formatVal(value)}`} />
+                {/* Fixed TypeScript error: changed (value: number) to (value: any) and added Number() casting to handle 'unknown' type from Recharts */}
+                <Tooltip cursor={{fill: '#F1EBE3'}} formatter={(value: any) => `€${formatVal(Number(value))}`} />
                 <Bar dataKey="amount" fill="var(--primary)" radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -341,6 +351,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       )}
 
+      {/* GRAFICO TREND MENSILE */}
       {visibleWidgets.monthlyTrend && chartData.length > 0 && (
         <div className="bg-white rounded-[2.5rem] p-6 border theme-border shadow-sm">
           <h3 className="text-[10px] font-black opacity-40 uppercase mb-6 tracking-widest">Trend Ultimi 6 Mesi</h3>
@@ -348,7 +359,8 @@ const Dashboard: React.FC<DashboardProps> = ({
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData}>
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#918B82', fontSize: 10, fontWeight: 900}} />
-                <Tooltip cursor={{fill: '#F1EBE3'}} formatter={(value: number) => `€${formatVal(value)}`} />
+                {/* Fixed TypeScript error: changed (value: number) to (value: any) and added Number() casting to handle 'unknown' type from Recharts */}
+                <Tooltip cursor={{fill: '#F1EBE3'}} formatter={(value: any) => `€${formatVal(Number(value))}`} />
                 <Bar dataKey="income" fill="#10B981" radius={[4, 4, 4, 4]} barSize={10} />
                 <Bar dataKey="total" fill="#F43F5E" radius={[4, 4, 4, 4]} barSize={10} />
               </BarChart>

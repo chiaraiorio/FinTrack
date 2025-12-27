@@ -67,13 +67,14 @@ const IncomeList: React.FC<IncomeListProps> = ({
         </div>
       </header>
 
+      {/* NUOVO SELETTORE MESE CENTRATO */}
       <div className="flex items-center justify-between bg-white rounded-3xl p-4 border theme-border shadow-sm mb-6">
         <button onClick={onPrevMonth} className="p-2 theme-primary active:scale-90 transition-transform">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7" /></svg>
         </button>
         <div className="text-center">
-          <h2 className="text-2xl font-black text-[#4A453E] capitalize">{monthName}</h2>
-          <p className="text-[10px] font-black opacity-30 uppercase tracking-widest">{selectedYear}</p>
+          <h2 className="text-2xl font-black text-[#4A453E] capitalize leading-none">{monthName}</h2>
+          <p className="text-[10px] font-black opacity-30 uppercase tracking-widest mt-1">{selectedYear}</p>
         </div>
         <button onClick={onNextMonth} className="p-2 theme-primary active:scale-90 transition-transform">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7" /></svg>

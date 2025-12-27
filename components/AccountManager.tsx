@@ -1,245 +1,305 @@
 
 import React, { useState, useEffect } from 'react';
-import { Account } from '../types';
+import { Account, SavingsJar, LinkedCard } from '../types';
+import CategoryIcon from './CategoryIcon';
 
 interface AccountManagerProps {
   accounts: Account[];
   onAdd: (acc: Omit<Account, 'id'>) => void;
   onUpdate: (acc: Account) => void;
   onDelete: (id: string) => void;
-  onAddIncome: () => void;
-  onMove?: (index: number, direction: 'up' | 'down') => void;
   hideBalances: boolean;
   onToggleHideBalances: () => void;
   onOpenSidebar: () => void;
+  jars: SavingsJar[];
+  onAddJar: (jar: Omit<SavingsJar, 'id'>) => void;
+  onUpdateJar: (jar: SavingsJar) => void;
+  onDeleteJar: (id: string) => void;
+  onMoveFunds: (amount: number, from: {type: 'acc' | 'card' | 'jar', id: string}, to: {type: 'acc' | 'card' | 'jar', id: string}, notes: string) => void;
 }
 
 const AccountManager: React.FC<AccountManagerProps> = ({ 
-  accounts, onAdd, onUpdate, onDelete, onAddIncome, onMove, 
-  hideBalances, onToggleHideBalances, onOpenSidebar 
+  accounts, onAdd, onUpdate, onDelete, 
+  hideBalances, onToggleHideBalances, onOpenSidebar,
+  jars, onAddJar, onUpdateJar, onDeleteJar, onMoveFunds
 }) => {
-  const [showForm, setShowForm] = useState(false);
-  const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
-  const [formState, setFormState] = useState<Omit<Account, 'id'>>({ 
-    name: '', 
-    balance: 0, 
-    type: 'Banca', 
-    color: '#8E7C68',
-    linkedCardName: ''
-  });
-  const [hasLinkedCard, setHasLinkedCard] = useState(false);
+  const [expandedAccountId, setExpandedAccountId] = useState<string | null>(null);
+  const [showAccForm, setShowAccForm] = useState(false);
+  const [showJarForm, setShowJarForm] = useState<string | null>(null);
+  const [showCardForm, setShowCardForm] = useState<string | null>(null);
+  const [activeTransfer, setActiveTransfer] = useState<{from: any, jar?: SavingsJar, card?: LinkedCard} | null>(null);
+  
+  // Form States (stringhe per input puliti)
+  const [accName, setAccName] = useState('');
+  const [accBalance, setAccBalance] = useState('');
+  const [accType, setAccType] = useState<'Banca' | 'Contanti' | 'Carta' | 'Altro'>('Banca');
+  
+  const [jarName, setJarName] = useState('');
+  const [jarTarget, setJarTarget] = useState('');
 
-  useEffect(() => {
-    if (editingAccountId) {
-      const acc = accounts.find(a => a.id === editingAccountId);
-      if (acc) {
-        setFormState({ 
-          name: acc.name, 
-          balance: acc.balance, 
-          type: acc.type, 
-          color: acc.color,
-          linkedCardName: acc.linkedCardName || ''
-        });
-        setHasLinkedCard(!!acc.linkedCardName);
-        setShowForm(true);
-      }
-    }
-  }, [editingAccountId, accounts]);
+  const [cardName, setCardName] = useState('');
+  const [cardBalance, setCardBalance] = useState('');
+  const [cardType, setCardType] = useState<'Credito' | 'Prepagata' | 'Debito'>('Debito');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [txAmount, setTxAmount] = useState('');
+
+  const handleAccSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (formState.name.trim()) {
-      const finalAccount = {
-        ...formState,
-        linkedCardName: hasLinkedCard ? formState.linkedCardName : undefined
-      };
-      
-      if (editingAccountId) {
-        onUpdate({ ...finalAccount, id: editingAccountId });
-      } else {
-        onAdd(finalAccount);
-      }
-      resetForm();
-    }
+    if (!accName.trim()) return;
+    onAdd({ name: accName, balance: parseFloat(accBalance) || 0, type: accType, color: '#8E7C68', cards: [] });
+    setAccName(''); setAccBalance(''); setShowAccForm(false);
   };
 
-  const resetForm = () => {
-    setFormState({ name: '', balance: 0, type: 'Banca', color: '#8E7C68', linkedCardName: '' });
-    setHasLinkedCard(false);
-    setEditingAccountId(null);
-    setShowForm(false);
+  const handleCardSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cardName.trim() || !showCardForm) return;
+    const acc = accounts.find(a => a.id === showCardForm);
+    if (!acc) return;
+    const newCard: LinkedCard = { id: crypto.randomUUID(), name: cardName, balance: parseFloat(cardBalance) || 0, type: cardType };
+    onUpdate({ ...acc, cards: [...acc.cards, newCard] });
+    setCardName(''); setCardBalance(''); setShowCardForm(null);
   };
 
-  const handleEditClick = (acc: Account) => {
-    setEditingAccountId(acc.id);
+  const handleJarSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!jarName.trim() || !jarTarget || !showJarForm) return;
+    onAddJar({ name: jarName, targetAmount: parseFloat(jarTarget) || 0, currentAmount: 0, accountId: showJarForm, color: '#8E7C68', icon: 'briefcase' });
+    setJarName(''); setJarTarget(''); setShowJarForm(null);
   };
 
-  const bankAccounts = accounts.filter(a => a.type === 'Banca' || a.type === 'Carta');
-  const cashAccounts = accounts.filter(a => a.type === 'Contanti');
-
-  const renderAccountCard = (a: Account) => {
-    const isCash = a.type === 'Contanti';
-    const globalIndex = accounts.findIndex(acc => acc.id === a.id);
+  const executeTransfer = (isToJar: boolean) => {
+    const amount = parseFloat(txAmount);
+    if (!activeTransfer || isNaN(amount) || amount <= 0) return;
     
-    return (
-      <div 
-        key={a.id} 
-        className="relative p-5 rounded-3xl text-white shadow-lg overflow-hidden group transition-all duration-300 active:scale-[0.98] h-44 flex flex-col justify-between"
-        style={{ 
-          background: `linear-gradient(145deg, ${a.color}, ${a.color}DD)`,
-          boxShadow: `0 8px 16px -4px ${a.color}40`
-        }}
-      >
-        <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform pointer-events-none z-0">
-          {isCash ? (
-            <svg className="w-24 h-24" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M3 6a2 2 0 012-2h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V6zm2 0v12h14V6H5zm2 2h2v2H7V8zm0 4h2v2H7v-2zm0 4h2v2H7v-2zm10-8h2v2h-2V8zm0 4h2v2h-2v-2zm0 4h2v2h-2v-2zm-6-4a2 2 0 100-4 2 2 0 000 4z"/>
-            </svg>
-          ) : (
-            <svg className="w-24 h-24" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V12h16v6zm0-10H4V6h16v2z"/>
-            </svg>
-          )}
-        </div>
-
-        <div className="relative z-10 w-full">
-          <div className="flex justify-between items-start">
-            <div className="flex flex-col">
-              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white/60 mb-0.5">{a.type}</span>
-              <h3 className="text-base font-black tracking-tight leading-tight truncate max-w-[120px]">{a.name}</h3>
-            </div>
-            
-            <div className="flex items-center gap-0.5 bg-black/10 backdrop-blur-md p-1 rounded-xl">
-              <button 
-                onClick={() => handleEditClick(a)}
-                className="p-1 hover:bg-white/10 rounded-md transition-colors active:scale-90"
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
-              </button>
-              <button 
-                onClick={() => { if(window.confirm('Eliminare questo conto?')) onDelete(a.id); }}
-                className="p-1 hover:bg-rose-500/40 rounded-md transition-colors active:scale-90"
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-              </button>
-            </div>
-          </div>
-        </div>
-        
-        <div className="relative z-10">
-          <p className="text-white/60 text-[9px] font-black uppercase tracking-widest mb-0.5">Saldo</p>
-          <div className="flex items-baseline gap-1">
-            <span className="text-xs font-bold opacity-80">€</span>
-            <span className="text-2xl font-black tabular-nums tracking-tighter">
-              {hideBalances ? '••••' : a.balance.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-            </span>
-          </div>
-        </div>
-      </div>
-    );
+    if (activeTransfer.jar) {
+      const from = isToJar ? {type: 'acc' as const, id: activeTransfer.from} : {type: 'jar' as const, id: activeTransfer.jar.id};
+      const to = isToJar ? {type: 'jar' as const, id: activeTransfer.jar.id} : {type: 'acc' as const, id: activeTransfer.from};
+      onMoveFunds(amount, from, to, isToJar ? `Risparmio per ${activeTransfer.jar.name}` : `Prelievo da ${activeTransfer.jar.name}`);
+    } else if (activeTransfer.card) {
+      const from = isToJar ? {type: 'acc' as const, id: activeTransfer.from} : {type: 'card' as const, id: activeTransfer.card.id};
+      const to = isToJar ? {type: 'card' as const, id: activeTransfer.card.id} : {type: 'acc' as const, id: activeTransfer.from};
+      onMoveFunds(amount, from, to, isToJar ? `Ricarica ${activeTransfer.card.name}` : `Storno da ${activeTransfer.card.name}`);
+    }
+    
+    setActiveTransfer(null);
+    setTxAmount('');
   };
 
   return (
-    <div className="p-6">
-      <header className="flex flex-col gap-4 mb-8">
-        <div className="flex justify-start items-center">
-          <button 
-            onClick={onOpenSidebar}
-            className="w-10 h-10 theme-card rounded-full flex items-center justify-center active:scale-90 transition-transform"
-          >
+    <div className="px-5 pt-12 space-y-8 pb-40">
+      <header className="flex flex-col gap-4">
+        <div className="flex justify-between items-center">
+          <button onClick={onOpenSidebar} className="w-10 h-10 theme-card rounded-full flex items-center justify-center active:scale-90 transition-transform">
             <svg className="w-6 h-6 theme-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16m-7 6h7" /></svg>
+          </button>
+          <button onClick={onToggleHideBalances} className="w-10 h-10 theme-card rounded-full flex items-center justify-center theme-primary">
+            {hideBalances ? <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" /></svg> : <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>}
           </button>
         </div>
         <div className="flex justify-between items-end">
-          <h1 className="text-4xl font-extrabold tracking-tight text-[#4A453E]">I Miei Conti</h1>
-          <div className="flex gap-2">
-            <button 
-              onClick={onToggleHideBalances}
-              className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-all ${hideBalances ? 'theme-bg-primary text-white border-transparent' : 'bg-white theme-primary theme-border'}`}
-            >
-              {hideBalances ? (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" /></svg>
-              ) : (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-              )}
-            </button>
-            <button 
-              onClick={() => { if(showForm) resetForm(); else setShowForm(true); }}
-              className="theme-bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg active:scale-95 transition-transform"
-            >
-              {showForm ? 'Annulla' : '+ Aggiungi'}
-            </button>
-          </div>
+          <h1 className="text-4xl font-black text-[#4A453E] tracking-tight">I miei Conti</h1>
+          <button onClick={() => setShowAccForm(true)} className="theme-bg-primary text-white p-2.5 rounded-2xl shadow-lg active:scale-95 transition-all">
+             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+          </button>
         </div>
       </header>
 
-      {showForm && (
-        <form onSubmit={handleSubmit} className="bg-white p-5 rounded-2xl border theme-border shadow-sm mb-10 space-y-4 animate-in fade-in zoom-in duration-300">
-          <h2 className="text-xs font-bold theme-primary uppercase tracking-wider mb-2">
-            {editingAccountId ? 'Modifica Conto' : 'Nuovo Conto'}
-          </h2>
-          <div>
-            <label className="block text-xs font-semibold opacity-60 uppercase mb-1">Nome Conto</label>
-            <input 
-              type="text" 
-              className="w-full px-4 py-2.5 theme-sub-bg rounded-xl border-none focus:ring-2 focus:ring-current theme-primary font-medium"
-              value={formState.name}
-              onChange={e => setFormState({...formState, name: e.target.value})}
-              placeholder="Es: Intesa Sanpaolo"
-              autoFocus
-            />
-          </div>
-          
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold opacity-60 uppercase mb-1">Saldo</label>
-              <input 
-                type="number" 
-                step="0.01"
-                className="w-full px-4 py-2.5 theme-sub-bg rounded-xl border-none focus:ring-2 focus:ring-current theme-primary font-medium"
-                value={formState.balance}
-                onChange={e => setFormState({...formState, balance: parseFloat(e.target.value) || 0})}
-              />
+      <section className="space-y-4">
+        {accounts.map(a => {
+          const isExpanded = expandedAccountId === a.id;
+          const accountJars = jars.filter(j => j.accountId === a.id);
+          const totalAssets = a.balance + a.cards.reduce((s, c) => s + c.balance, 0) + accountJars.reduce((s, j) => s + j.currentAmount, 0);
+
+          return (
+            <div key={a.id} className={`bg-white rounded-[2.5rem] border theme-border shadow-sm transition-all duration-300 ${isExpanded ? 'ring-2 theme-primary ring-opacity-20' : ''}`}>
+              <div onClick={() => setExpandedAccountId(isExpanded ? null : a.id)} className="p-6 flex items-center justify-between cursor-pointer">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: a.color }}>
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                  </div>
+                  <div>
+                    <h4 className="font-black text-[#4A453E] text-lg leading-tight">{a.name}</h4>
+                    <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest">Totale Asset</p>
+                  </div>
+                </div>
+                <div className="text-right flex items-center gap-3">
+                  <div>
+                    <p className="text-xl font-black text-[#4A453E] tracking-tight">{hideBalances ? '€ ••••' : `€${totalAssets.toLocaleString('it-IT')}`}</p>
+                    <p className="text-[10px] font-bold theme-primary uppercase">{isExpanded ? 'Chiudi' : 'Dettagli'}</p>
+                  </div>
+                  <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+                    <svg className="w-4 h-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
+                  </div>
+                </div>
+              </div>
+
+              {isExpanded && (
+                <div className="px-6 pb-8 space-y-8 animate-in slide-in-from-top-4 border-t theme-border pt-6">
+                  {/* Liquidità */}
+                  <div className="bg-gray-50 p-5 rounded-3xl flex items-center justify-between border theme-border">
+                    <div className="flex items-center gap-4">
+                       <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center theme-primary shadow-sm">
+                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                       </div>
+                       <div>
+                         <p className="text-xs font-black text-[#4A453E]">Liquidità Conto</p>
+                         <p className="text-[10px] opacity-40 uppercase font-bold">Disponibilità immediata</p>
+                       </div>
+                    </div>
+                    <p className="text-lg font-black text-[#4A453E]">€{a.balance.toLocaleString('it-IT')}</p>
+                  </div>
+
+                  {/* Carte */}
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center px-1">
+                      <h5 className="text-[10px] font-black opacity-50 uppercase tracking-widest">Le mie Carte</h5>
+                      <button onClick={() => setShowCardForm(a.id)} className="theme-primary text-[10px] font-black uppercase">+ Aggiungi Carta</button>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3">
+                      {a.cards.map(card => (
+                        <div key={card.id} className="theme-sub-bg p-4 rounded-2xl flex items-center justify-between border theme-border group">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-6 bg-white border theme-border rounded flex items-center justify-center opacity-80">
+                               <div className="w-4 h-3 bg-gray-200 rounded-sm"></div>
+                            </div>
+                            <div>
+                              <p className="text-xs font-black text-[#4A453E]">{card.name}</p>
+                              <p className="text-[9px] font-bold opacity-40 uppercase">{card.type}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <p className="text-sm font-black text-[#4A453E]">€{card.balance.toLocaleString('it-IT')}</p>
+                            <button onClick={() => setActiveTransfer({from: a.id, card: card})} className="p-2 theme-primary bg-white rounded-lg shadow-sm active:scale-90 transition-transform">
+                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Salvadanai */}
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center px-1">
+                      <h5 className="text-[10px] font-black opacity-50 uppercase tracking-widest">Salvadanai Interni</h5>
+                      <button onClick={() => setShowJarForm(a.id)} className="theme-primary text-[10px] font-black uppercase">+ Nuovo Salvadanaio</button>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3">
+                      {accountJars.map(jar => {
+                        const progress = (jar.currentAmount / jar.targetAmount) * 100;
+                        return (
+                          <div key={jar.id} className="theme-sub-bg p-5 rounded-3xl border theme-border space-y-4">
+                            <div className="flex justify-between items-center">
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center theme-primary shadow-sm">
+                                  <CategoryIcon iconName={jar.icon} className="w-5 h-5" color="var(--primary)" />
+                                </div>
+                                <span className="text-sm font-black text-[#4A453E]">{jar.name}</span>
+                              </div>
+                              <button onClick={() => setActiveTransfer({from: a.id, jar: jar})} className="px-4 py-2 bg-white rounded-xl text-[10px] font-black theme-primary uppercase tracking-widest shadow-sm active:scale-95">Gestisci Risparmi</button>
+                            </div>
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-baseline">
+                                <p className="text-lg font-black text-[#4A453E]">€{jar.currentAmount.toLocaleString()} <span className="text-[10px] opacity-30 font-bold">/ €{jar.targetAmount.toLocaleString()}</span></p>
+                                <span className="text-xs font-black theme-primary">{progress.toFixed(0)}%</span>
+                              </div>
+                              <div className="w-full h-2 bg-white rounded-full overflow-hidden">
+                                <div className="h-full theme-bg-primary transition-all duration-700" style={{ width: `${progress}%` }} />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            <div>
-              <label className="block text-xs font-semibold opacity-60 uppercase mb-1">Tipo</label>
-              <select 
-                className="w-full px-4 py-2.5 theme-sub-bg rounded-xl border-none focus:ring-2 focus:ring-current theme-primary font-medium"
-                value={formState.type}
-                onChange={e => setFormState({...formState, type: e.target.value as any})}
-              >
+          );
+        })}
+      </section>
+
+      {/* MODALI FORM */}
+      {showAccForm && (
+        <div className="fixed inset-0 bg-[#4A453E]/40 backdrop-blur-sm z-[110] flex items-center justify-center p-6">
+          <form onSubmit={handleAccSubmit} className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl space-y-6">
+            <h3 className="text-xl font-black text-center text-[#4A453E]">Nuovo Conto</h3>
+            <div className="space-y-4">
+              <input type="text" placeholder="Nome Banca" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={accName} onChange={e => setAccName(e.target.value)} required />
+              <input type="number" placeholder="Saldo Liquido Iniziale" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={accBalance} onChange={e => setAccBalance(e.target.value)} required />
+              <select className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={accType} onChange={e => setAccType(e.target.value as any)}>
                 <option value="Banca">Banca</option>
-                <option value="Carta">Carta</option>
                 <option value="Contanti">Contanti</option>
-                <option value="Altro">Altro</option>
+                <option value="Carta">Carta (Wallet/Prepagata)</option>
               </select>
             </div>
-          </div>
-
-          <button type="submit" className="w-full py-3 theme-bg-primary text-white rounded-xl font-bold shadow-md active:scale-95 transition-transform">
-            {editingAccountId ? 'Aggiorna Conto' : 'Crea Conto'}
-          </button>
-        </form>
+            <div className="flex gap-2">
+              <button type="submit" className="flex-1 py-4 theme-bg-primary text-white rounded-2xl font-black text-sm">Crea Conto</button>
+              <button type="button" onClick={() => setShowAccForm(false)} className="px-6 py-4 theme-sub-bg text-[#918B82] rounded-2xl font-black text-sm">Chiudi</button>
+            </div>
+          </form>
+        </div>
       )}
 
-      <div className="space-y-8">
-        <section>
-          <h3 className="text-[10px] font-black opacity-60 uppercase tracking-[0.2em] mb-4 ml-1">Conti Bancari</h3>
-          <div className="grid grid-cols-1 gap-4">
-            {bankAccounts.map(renderAccountCard)}
-          </div>
-        </section>
+      {showCardForm && (
+        <div className="fixed inset-0 bg-[#4A453E]/40 backdrop-blur-sm z-[110] flex items-center justify-center p-6">
+          <form onSubmit={handleCardSubmit} className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl space-y-6">
+            <h3 className="text-xl font-black text-center text-[#4A453E]">Aggiungi Carta</h3>
+            <div className="space-y-4">
+              <input type="text" placeholder="Nome Carta (es: Visa, Prepagata...)" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={cardName} onChange={e => setCardName(e.target.value)} required />
+              <input type="number" placeholder="Saldo Attuale Carta" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={cardBalance} onChange={e => setCardBalance(e.target.value)} required />
+              <select className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={cardType} onChange={e => setCardType(e.target.value as any)}>
+                <option value="Prepagata">Carta Prepagata</option>
+                <option value="Credito">Carta di Credito</option>
+                <option value="Debito">Carta di Debito</option>
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <button type="submit" className="flex-1 py-4 theme-bg-primary text-white rounded-2xl font-black text-sm">Aggiungi</button>
+              <button type="button" onClick={() => setShowCardForm(null)} className="px-6 py-4 theme-sub-bg text-[#918B82] rounded-2xl font-black text-sm">Esci</button>
+            </div>
+          </form>
+        </div>
+      )}
 
-        <section>
-          <h3 className="text-[10px] font-black opacity-60 uppercase tracking-[0.2em] mb-4 ml-1">Contanti</h3>
-          <div className="grid grid-cols-1 gap-4">
-            {cashAccounts.map(renderAccountCard)}
+      {showJarForm && (
+        <div className="fixed inset-0 bg-[#4A453E]/40 backdrop-blur-sm z-[110] flex items-center justify-center p-6">
+          <form onSubmit={handleJarSubmit} className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl space-y-6">
+            <h3 className="text-xl font-black text-center text-[#4A453E]">Nuovo Obiettivo</h3>
+            <div className="space-y-4">
+              <input type="text" placeholder="Nome Obiettivo" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={jarName} onChange={e => setJarName(e.target.value)} required />
+              <input type="number" placeholder="Target (€)" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={jarTarget} onChange={e => setJarTarget(e.target.value)} required />
+            </div>
+            <div className="flex gap-2">
+              <button type="submit" className="flex-1 py-4 theme-bg-primary text-white rounded-2xl font-black text-sm">Crea</button>
+              <button type="button" onClick={() => setShowJarForm(null)} className="px-6 py-4 theme-sub-bg text-[#918B82] rounded-2xl font-black text-sm">Chiudi</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODALE TRASFERIMENTO FONDI */}
+      {activeTransfer && (
+        <div className="fixed inset-0 bg-[#4A453E]/40 backdrop-blur-sm z-[120] flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-xs rounded-[2.5rem] p-8 shadow-2xl space-y-6">
+            <div className="text-center">
+              <h3 className="text-xl font-black text-[#4A453E]">Sposta Fondi</h3>
+              <p className="text-xs text-[#918B82] font-medium mt-1">Tra Liquidità e {activeTransfer.jar?.name || activeTransfer.card?.name}</p>
+            </div>
+            <div className="space-y-4">
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black theme-primary">€</span>
+                <input type="number" autoFocus className="w-full pl-8 pr-4 py-4 bg-[#FAF7F2] rounded-2xl text-2xl font-black theme-primary outline-none text-center" placeholder="0.00" value={txAmount} onChange={e => setTxAmount(e.target.value)} />
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <button onClick={() => executeTransfer(true)} className="w-full py-4 theme-bg-primary text-white rounded-2xl font-black text-sm active:scale-95 shadow-lg">Versa / Carica</button>
+              <button onClick={() => executeTransfer(false)} className="w-full py-4 bg-rose-50 text-rose-500 rounded-2xl font-black text-sm active:scale-95 border border-rose-100">Prelieva / Storna</button>
+              <button onClick={() => setActiveTransfer(null)} className="w-full py-3 text-[#918B82] font-bold text-xs uppercase tracking-widest mt-2">Chiudi</button>
+            </div>
           </div>
-        </section>
-      </div>
-      <div className="pb-32"></div>
+        </div>
+      )}
     </div>
   );
 };

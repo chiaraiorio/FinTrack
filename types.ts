@@ -44,13 +44,21 @@ export interface IncomeCategory {
   color: string;
 }
 
-export interface Account {
+export interface LinkedCard {
   id: string;
   name: string;
   balance: number;
+  type: 'Credito' | 'Prepagata' | 'Debito';
+  lastFour?: string;
+}
+
+export interface Account {
+  id: string;
+  name: string;
+  balance: number; 
   type: 'Banca' | 'Contanti' | 'Carta' | 'Altro';
   color: string;
-  linkedCardName?: string;
+  cards: LinkedCard[];
 }
 
 export interface SavingsJar {
@@ -68,13 +76,12 @@ export interface Expense {
   amount: number;
   categoryId: string;
   accountId: string;
-  date: string; // ISO format: YYYY-MM-DD
+  cardId?: string;
+  date: string;
   notes: string;
   repeatability: Repeatability;
-  isRecurringSource?: boolean;
-  parentExpenseId?: string;
-  lastProcessedDate?: string;
   usedLinkedCard?: boolean;
+  isInternalTransfer?: boolean;
 }
 
 export interface Income {
@@ -84,6 +91,8 @@ export interface Income {
   categoryId: string;
   date: string;
   notes: string;
+  isInternalTransfer?: boolean;
+  fromAccountId?: string;
 }
 
-export type ViewType = 'list' | 'dashboard' | 'categories' | 'accounts' | 'settings' | 'export' | 'monthly_reports' | 'auth' | 'profile' | 'security' | 'financial_analysis' | 'income_list' | 'income_categories' | 'ai_advisor' | 'search' | 'savings_jars';
+export type ViewType = 'list' | 'dashboard' | 'categories' | 'accounts' | 'settings' | 'export' | 'monthly_reports' | 'auth' | 'profile' | 'security' | 'bank_sync' | 'ai_advisor' | 'search' | 'income_list';

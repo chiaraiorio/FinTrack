@@ -18,12 +18,10 @@ export const INITIAL_INCOME_CATEGORIES: IncomeCategory[] = [
 ];
 
 export const INITIAL_ACCOUNTS: Account[] = [
-  { id: 'acc1', name: 'Banca Intesa', balance: 1500, type: 'Banca', color: '#3B82F6' },
-  { id: 'acc2', name: 'UniCredit', balance: 500, type: 'Banca', color: '#8B5CF6' },
-  { id: 'acc3', name: 'Revolut', balance: 3000, type: 'Banca', color: '#10B981' },
-  { id: 'acc4', name: 'Portafoglio', balance: 150, type: 'Contanti', color: '#F59E0B' },
-  { id: 'acc5', name: 'Cassaforte', balance: 80, type: 'Contanti', color: '#6B7280' },
-  { id: 'acc6', name: 'Contanti Casa', balance: 200, type: 'Contanti', color: '#EF4444' },
+  { id: 'acc1', name: 'Banca Intesa', balance: 1500, type: 'Banca', color: '#3B82F6', cards: [] },
+  { id: 'acc2', name: 'UniCredit', balance: 500, type: 'Banca', color: '#8B5CF6', cards: [] },
+  { id: 'acc3', name: 'Revolut', balance: 3000, type: 'Banca', color: '#10B981', cards: [] },
+  { id: 'acc4', name: 'Portafoglio', balance: 150, type: 'Contanti', color: '#F59E0B', cards: [] },
 ];
 
 export const REPEAT_OPTIONS = Object.values(Repeatability);

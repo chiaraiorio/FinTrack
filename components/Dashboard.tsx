@@ -1,7 +1,7 @@
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Expense, Income, Category, Account, ViewType, SavingsJar } from '../types';
+import { Expense, Income, Category, Account, ViewType, SavingsJar, IncomeCategory } from '../types';
 import CategoryIcon from './CategoryIcon';
 
 interface DashboardProps {
@@ -9,6 +9,7 @@ interface DashboardProps {
   incomes: Income[];
   categories: Category[];
   accounts: Account[];
+  incomeCategories: IncomeCategory[];
   onOpenSidebar: () => void;
   isDetailed?: boolean;
   onBack?: () => void;
@@ -16,80 +17,63 @@ interface DashboardProps {
   savingsJars?: SavingsJar[];
 }
 
-const WIDGETS = [
-  { id: 'liquidity', label: 'Liquidità Totale', icon: '💰' },
-  { id: 'summary', label: 'Riepilogo Bilancio', icon: '📊' },
-  { id: 'savings', label: 'Obiettivi Risparmio', icon: '🎯' },
-  { id: 'comparison', label: 'Confronto Performance', icon: '📈' },
-  { id: 'trend', label: 'Trend Temporale', icon: '📉' },
-  { id: 'pie', label: 'Suddivisione Categorie', icon: '🥧' }
-];
-
-const Dashboard: React.FC<DashboardProps> = ({ expenses, incomes, categories, accounts, onOpenSidebar, isDetailed = false, onBack, onNavigate, savingsJars = [] }) => {
+const Dashboard: React.FC<DashboardProps> = ({ 
+  expenses, 
+  incomes, 
+  categories, 
+  accounts, 
+  incomeCategories,
+  onOpenSidebar, 
+  onNavigate, 
+  savingsJars = [] 
+}) => {
   const [timeframe, setTimeframe] = useState<'month' | 'year'>('month');
-  const [showCustomizer, setShowCustomizer] = useState(false);
-  const [enabledWidgets, setEnabledWidgets] = useState<string[]>(() => {
-    const saved = localStorage.getItem('dashboard_widgets');
-    return saved ? JSON.parse(saved) : WIDGETS.map(w => w.id);
-  });
+  const [isAssetsExpanded, setIsAssetsExpanded] = useState(false);
+  const [isIncomeExpanded, setIsIncomeExpanded] = useState(false);
+  const [isExpenseExpanded, setIsExpenseExpanded] = useState(false);
 
-  useEffect(() => {
-    localStorage.setItem('dashboard_widgets', JSON.stringify(enabledWidgets));
-  }, [enabledWidgets]);
+  // Filtriamo i trasferimenti interni per mostrare solo entrate/uscite REALI nel dashboard
+  const realExpenses = useMemo(() => expenses.filter(e => !e.isInternalTransfer), [expenses]);
+  const realIncomes = useMemo(() => incomes.filter(i => !i.isInternalTransfer), [incomes]);
 
-  const toggleWidget = (id: string) => {
-    setEnabledWidgets(prev => 
-      prev.includes(id) ? prev.filter(w => w !== id) : [...prev, id]
-    );
-  };
+  const totalExpenses = useMemo(() => realExpenses.reduce((s, e) => s + e.amount, 0), [realExpenses]);
+  const totalIncomes = useMemo(() => realIncomes.reduce((s, i) => s + i.amount, 0), [realIncomes]);
+  
+  const totalLiquidity = useMemo(() => 
+    accounts.reduce((s, a) => s + a.balance + a.cards.reduce((cs, c) => cs + c.balance, 0), 0), 
+  [accounts]);
 
-  const isWidgetEnabled = (id: string) => enabledWidgets.includes(id);
-
-  const comparisonStats = useMemo(() => {
-    const now = new Date();
-    const currMonth = now.getMonth();
-    const currYear = now.getFullYear();
-    const prevMonthDate = new Date(currYear, currMonth - 1, 1);
-    const prevMonth = prevMonthDate.getMonth();
-    const prevMonthYear = prevMonthDate.getFullYear();
-    const prevYear = currYear - 1;
-
-    let expenseCurrMonth = 0; let expensePrevMonth = 0;
-    let expenseCurrYear = 0; let expensePrevYear = 0;
-
-    expenses.forEach(e => {
-      const d = new Date(e.date);
-      const m = d.getMonth();
-      const y = d.getFullYear();
-      if (m === currMonth && y === currYear) expenseCurrMonth += e.amount;
-      if (m === prevMonth && y === prevMonthYear) expensePrevMonth += e.amount;
-      if (y === currYear) expenseCurrYear += e.amount;
-      if (y === prevYear) expensePrevYear += e.amount;
-    });
-
-    const calcDelta = (curr: number, prev: number) => {
-      if (prev === 0) return curr > 0 ? 100 : 0;
-      return ((curr - prev) / prev) * 100;
-    };
-
-    return {
-      month: { curr: expenseCurrMonth, prev: expensePrevMonth, delta: calcDelta(expenseCurrMonth, expensePrevMonth) },
-      year: { curr: expenseCurrYear, prev: expensePrevYear, delta: calcDelta(expenseCurrYear, expensePrevYear) }
-    };
-  }, [expenses]);
-
-  const categoryData = useMemo(() => {
-    const data: Record<string, number> = {};
-    expenses.forEach(e => {
+  // Suddivisione Uscite per Categoria
+  const expenseCategoryData = useMemo(() => {
+    const data: Record<string, { amount: number, icon: string, color: string }> = {};
+    realExpenses.forEach(e => {
       const cat = categories.find(c => c.id === e.categoryId);
       const name = cat ? cat.name : 'Altro';
-      data[name] = (data[name] || 0) + e.amount;
+      if (!data[name]) {
+        data[name] = { amount: 0, icon: cat?.icon || 'generic', color: cat?.color || '#8E7C68' };
+      }
+      data[name].amount += e.amount;
     });
-    return Object.entries(data).map(([name, value]) => ({ 
-      name, value,
-      color: categories.find(c => c.name === name)?.color || '#B8B0A5'
-    })).sort((a, b) => b.value - a.value);
-  }, [expenses, categories]);
+    return Object.entries(data)
+      .map(([name, info]) => ({ name, ...info }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [realExpenses, categories]);
+
+  // Suddivisione Entrate per Categoria
+  const incomeCategoryData = useMemo(() => {
+    const data: Record<string, { amount: number, icon: string, color: string }> = {};
+    realIncomes.forEach(i => {
+      const cat = incomeCategories.find(c => c.id === i.categoryId);
+      const name = cat ? cat.name : 'Altro';
+      if (!data[name]) {
+        data[name] = { amount: 0, icon: cat?.icon || 'generic', color: cat?.color || '#10B981' };
+      }
+      data[name].amount += i.amount;
+    });
+    return Object.entries(data)
+      .map(([name, info]) => ({ name, ...info }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [realIncomes, incomeCategories]);
 
   const chartData = useMemo(() => {
     const data: Record<string, { total: number; income: number }> = {};
@@ -100,226 +84,147 @@ const Dashboard: React.FC<DashboardProps> = ({ expenses, incomes, categories, ac
         const key = d.toLocaleString('it-IT', { month: 'short' });
         data[key] = { total: 0, income: 0 };
       }
-      expenses.forEach(e => {
-        const date = new Date(e.date);
-        const key = date.toLocaleString('it-IT', { month: 'short' });
-        if (data[key] !== undefined) data[key].total += e.amount;
+      realExpenses.forEach(e => {
+        const key = new Date(e.date).toLocaleString('it-IT', { month: 'short' });
+        if (data[key]) data[key].total += e.amount;
       });
-      incomes.forEach(inc => {
-        const date = new Date(inc.date);
-        const key = date.toLocaleString('it-IT', { month: 'short' });
-        if (data[key] !== undefined) data[key].income += inc.amount;
-      });
-    } else {
-      for(let i=2; i>=0; i--) {
-        const key = (now.getFullYear() - i).toString();
-        data[key] = { total: 0, income: 0 };
-      }
-      expenses.forEach(e => {
-        const date = new Date(e.date);
-        const key = date.getFullYear().toString();
-        if (data[key] !== undefined) data[key].total += e.amount;
-      });
-      incomes.forEach(inc => {
-        const date = new Date(inc.date);
-        const key = date.getFullYear().toString();
-        if (data[key] !== undefined) data[key].income += inc.amount;
+      realIncomes.forEach(i => {
+        const key = new Date(i.date).toLocaleString('it-IT', { month: 'short' });
+        if (data[key]) data[key].income += i.amount;
       });
     }
     return Object.entries(data).map(([name, vals]) => ({ name, ...vals }));
-  }, [expenses, incomes, timeframe]);
-
-  const totalExpenses = categoryData.reduce((s, d) => s + d.value, 0);
-  const totalIncomes = incomes.reduce((s, d) => s + d.amount, 0);
-  const totalLiquidity = accounts.reduce((s, a) => s + a.balance, 0);
+  }, [realExpenses, realIncomes, timeframe]);
 
   return (
     <div className="px-5 pt-12 space-y-8 pb-32 animate-in fade-in duration-500">
-      <header className="flex flex-col gap-4">
-        <div className="flex justify-between items-center">
-          <div className="flex gap-3">
-            <button onClick={onOpenSidebar} className="w-10 h-10 theme-card rounded-full flex items-center justify-center active:scale-90 hover:scale-110 transition-transform">
-              <svg className="w-6 h-6 theme-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16m-7 6h7" /></svg>
-            </button>
-            <button 
-              onClick={() => onNavigate && onNavigate('search')}
-              className="w-10 h-10 theme-card rounded-full flex items-center justify-center active:scale-90 hover:scale-110 transition-transform"
-            >
-              <svg className="w-5 h-5 theme-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-            </button>
-          </div>
-          
-          <button 
-            onClick={() => setShowCustomizer(true)}
-            className="flex items-center gap-2 theme-sub-bg theme-primary px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider border theme-border active:scale-95 hover:scale-105 transition-transform"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-            Personalizza
-          </button>
-        </div>
-        <div className="flex justify-between items-end">
-          <h1 className="text-4xl font-black tracking-tight text-[#4A453E]">Dashboard</h1>
-          <div className="flex bg-[#EBE4D8]/50 p-1 rounded-xl text-[10px] font-black uppercase tracking-widest text-[#918B82]">
-            <button onClick={() => setTimeframe('month')} className={`px-3 py-1.5 rounded-lg transition-all ${timeframe === 'month' ? 'bg-white text-[#8E7C68] shadow-sm' : ''}`}>Mesi</button>
-            <button onClick={() => setTimeframe('year')} className={`px-3 py-1.5 rounded-lg transition-all ${timeframe === 'year' ? 'bg-white text-[#8E7C68] shadow-sm' : ''}`}>Anni</button>
-          </div>
-        </div>
+      <header className="flex justify-between items-center">
+        <button onClick={onOpenSidebar} className="w-10 h-10 theme-card rounded-full flex items-center justify-center active:scale-90 transition-transform">
+          <svg className="w-6 h-6 theme-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16m-7 6h7" /></svg>
+        </button>
+        <h1 className="text-2xl font-black text-[#4A453E]">Home</h1>
+        <div className="w-10" />
       </header>
 
-      {showCustomizer && (
-        <div className="fixed inset-0 bg-[#4A453E]/40 backdrop-blur-sm z-[110] flex items-center justify-center p-6 animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl space-y-6 animate-in zoom-in duration-300">
-            <div className="text-center">
-              <h3 className="text-xl font-black text-[#4A453E]">Gestione Dashboard</h3>
-              <p className="text-[12px] text-[#918B82] font-medium mt-1">Scegli quali grafici e schede mostrare</p>
-            </div>
-            <div className="space-y-2">
-              {WIDGETS.map(w => (
-                <button 
-                  key={w.id} 
-                  onClick={() => toggleWidget(w.id)}
-                  className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all border ${isWidgetEnabled(w.id) ? 'theme-bg-primary text-white border-transparent' : 'bg-gray-50 text-[#4A453E] border-[#EBE4D8]'}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg">{w.icon}</span>
-                    <span className="font-bold text-sm uppercase tracking-tight">{w.label}</span>
-                  </div>
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isWidgetEnabled(w.id) ? 'bg-white border-white' : 'border-[#D9D1C5]'}`}>
-                    {isWidgetEnabled(w.id) && <svg className="w-3 h-3 theme-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" /></svg>}
-                  </div>
-                </button>
-              ))}
-            </div>
-            <button onClick={() => setShowCustomizer(false)} className="w-full py-4 theme-bg-primary text-white rounded-2xl font-black text-sm active:scale-95 transition-transform">Fine</button>
-          </div>
-        </div>
-      )}
-
-      <div className="space-y-4">
-        {isWidgetEnabled('liquidity') && (
-          <div className="theme-card rounded-[2.5rem] p-6 shadow-sm border theme-border text-center bg-white animate-in zoom-in duration-500 hover:scale-[1.01] hover:shadow-md transition-all duration-300">
-            <p className="text-[10px] font-black opacity-60 uppercase mb-1 tracking-[0.2em]">Liquidità Disponibile</p>
-            <p className="text-4xl font-black text-sky-400 tracking-tighter">€{totalLiquidity.toLocaleString('it-IT', { minimumFractionDigits: 2 })}</p>
-          </div>
-        )}
-
-        {isWidgetEnabled('summary') && (
-          <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-bottom duration-500">
-            <div className="bg-white rounded-[2rem] p-5 shadow-sm border theme-border hover:scale-[1.02] transition-transform duration-300">
-              <p className="text-[9px] font-black opacity-60 uppercase mb-1 tracking-wider">Entrate Totali</p>
-              <p className="text-xl font-black text-emerald-500">€{totalIncomes.toFixed(2)}</p>
-            </div>
-            <div className="bg-white rounded-[2rem] p-5 shadow-sm border theme-border hover:scale-[1.02] transition-transform duration-300">
-              <p className="text-[9px] font-black opacity-60 uppercase mb-1 tracking-wider">Uscite Totali</p>
-              <p className="text-xl font-black text-rose-400">€{totalExpenses.toFixed(2)}</p>
+      <section className="space-y-4">
+        {/* SCHEDA PATRIMONIO ESPANDIBILE */}
+        <div 
+          onClick={() => setIsAssetsExpanded(!isAssetsExpanded)}
+          className={`theme-card rounded-[2.5rem] p-8 bg-white border theme-border shadow-sm transition-all duration-300 cursor-pointer active:scale-[0.98] ${isAssetsExpanded ? 'ring-2 ring-offset-2 theme-primary ring-opacity-20' : ''}`}
+        >
+          <div className="text-center relative">
+            <p className="text-[10px] font-black opacity-40 uppercase tracking-widest mb-1">Patrimonio Totale</p>
+            <p className="text-4xl font-black text-[#4A453E] tracking-tighter">€{totalLiquidity.toLocaleString('it-IT')}</p>
+            
+            <div className={`absolute right-0 top-1/2 -translate-y-1/2 transition-transform duration-300 ${isAssetsExpanded ? 'rotate-180' : ''}`}>
+              <svg className="w-5 h-5 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
             </div>
           </div>
-        )}
-      </div>
 
-      {isWidgetEnabled('savings') && savingsJars.length > 0 && (
-        <section className="space-y-4 animate-in slide-in-from-bottom duration-500">
-           <div className="flex justify-between items-center px-2">
-              <h3 className="text-[10px] font-black opacity-60 uppercase tracking-[0.15em]">Obiettivi Risparmio</h3>
-              <button onClick={() => onNavigate && onNavigate('savings_jars')} className="text-[10px] font-black theme-primary uppercase tracking-widest">Tutti</button>
-           </div>
-           <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
-              {savingsJars.slice(0, 3).map(jar => {
-                const progress = Math.min(100, (jar.currentAmount / jar.targetAmount) * 100);
+          {isAssetsExpanded && (
+            <div className="mt-8 pt-6 border-t theme-border space-y-4 animate-in slide-in-from-top-4 duration-300">
+              {accounts.map(acc => {
+                const accTotal = acc.balance + acc.cards.reduce((s, c) => s + c.balance, 0);
                 return (
-                  <div key={jar.id} className="min-w-[200px] bg-white rounded-[2rem] p-5 border theme-border shadow-sm space-y-3">
+                  <div key={acc.id} className="flex items-center justify-between group">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 theme-sub-bg rounded-xl flex items-center justify-center theme-primary">
-                        <CategoryIcon iconName={jar.icon} className="w-5 h-5" color="var(--primary)" />
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center opacity-80" style={{ backgroundColor: acc.color }}>
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
                       </div>
-                      <span className="font-bold text-sm text-[#4A453E] truncate">{jar.name}</span>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] font-black">
-                        <span className="opacity-40 uppercase">Avanzamento</span>
-                        <span className="theme-primary">{progress.toFixed(0)}%</span>
-                      </div>
-                      <div className="w-full h-2 theme-sub-bg rounded-full overflow-hidden">
-                        <div className="h-full theme-bg-primary rounded-full" style={{ width: `${progress}%` }} />
+                      <div>
+                        <p className="text-xs font-black text-[#4A453E]">{acc.name}</p>
+                        <p className="text-[9px] font-bold opacity-30 uppercase">{acc.type}</p>
                       </div>
                     </div>
+                    <p className="text-sm font-black text-[#4A453E]">€{accTotal.toLocaleString('it-IT')}</p>
                   </div>
                 );
               })}
-           </div>
-        </section>
-      )}
+            </div>
+          )}
+        </div>
 
-      {isWidgetEnabled('comparison') && (
-        <section className="space-y-4 animate-in slide-in-from-bottom duration-500">
-          <h3 className="text-[10px] font-black opacity-60 uppercase tracking-[0.15em] ml-2">Confronto Performance</h3>
-          <div className="grid grid-cols-1 gap-4">
-            <div className="bg-white rounded-[2.5rem] p-6 border theme-border shadow-sm flex justify-between items-center hover:scale-[1.01] hover:shadow-md transition-all duration-300">
-              <div className="space-y-1">
-                <p className="text-[10px] font-black opacity-60 uppercase tracking-widest">Questo Mese vs Scorso</p>
-                <p className="text-2xl font-black text-[#4A453E]">€{comparisonStats.month.curr.toFixed(2)}</p>
-                <p className="text-[11px] font-medium text-[#918B82]">Mese scorso: €{comparisonStats.month.prev.toFixed(2)}</p>
+        <div className="grid grid-cols-1 gap-4">
+          {/* ENTRATE ESPANDIBILI */}
+          <div 
+            onClick={() => setIsIncomeExpanded(!isIncomeExpanded)}
+            className={`bg-emerald-50 rounded-[2.5rem] p-6 border border-emerald-100 transition-all duration-300 cursor-pointer active:scale-[0.98] ${isIncomeExpanded ? 'ring-2 ring-emerald-200' : ''}`}
+          >
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-[9px] font-black text-emerald-800 opacity-60 uppercase mb-1">Entrate Reali</p>
+                <p className="text-2xl font-black text-emerald-600">€{totalIncomes.toLocaleString('it-IT')}</p>
               </div>
-              <div className={`px-4 py-2 rounded-2xl flex items-center gap-1.5 ${comparisonStats.month.delta <= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500'}`}>
-                <svg className={`w-4 h-4 ${comparisonStats.month.delta > 0 ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                </svg>
-                <span className="font-black text-sm">{Math.abs(comparisonStats.month.delta).toFixed(1)}%</span>
+              <div className={`transition-transform duration-300 ${isIncomeExpanded ? 'rotate-180' : ''}`}>
+                <svg className="w-5 h-5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
               </div>
             </div>
+            
+            {isIncomeExpanded && (
+              <div className="mt-6 pt-4 border-t border-emerald-100 space-y-3 animate-in slide-in-from-top-2">
+                {incomeCategoryData.map(cat => (
+                  <div key={cat.name} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center text-emerald-500 shadow-sm">
+                        <CategoryIcon iconName={cat.icon} className="w-4 h-4" />
+                      </div>
+                      <span className="text-[11px] font-bold text-emerald-900">{cat.name}</span>
+                    </div>
+                    <span className="text-[11px] font-black text-emerald-600">€{cat.amount.toLocaleString('it-IT')}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        </section>
-      )}
 
-      {isWidgetEnabled('trend') && (
-        <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border theme-border overflow-hidden animate-in slide-in-from-bottom duration-500 hover:scale-[1.01] hover:shadow-md transition-all duration-300">
-          <h3 className="text-[10px] font-black opacity-60 uppercase mb-6 tracking-[0.15em]">Trend {timeframe === 'month' ? 'Mensile' : 'Annuale'}</h3>
-          <div className="h-64 w-full">
+          {/* USCITE ESPANDIBILI */}
+          <div 
+            onClick={() => setIsExpenseExpanded(!isExpenseExpanded)}
+            className={`bg-rose-50 rounded-[2.5rem] p-6 border border-rose-100 transition-all duration-300 cursor-pointer active:scale-[0.98] ${isExpenseExpanded ? 'ring-2 ring-rose-200' : ''}`}
+          >
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-[9px] font-black text-rose-800 opacity-60 uppercase mb-1">Spese Reali</p>
+                <p className="text-2xl font-black text-rose-500">€{totalExpenses.toLocaleString('it-IT')}</p>
+              </div>
+              <div className={`transition-transform duration-300 ${isExpenseExpanded ? 'rotate-180' : ''}`}>
+                <svg className="w-5 h-5 text-rose-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
+              </div>
+            </div>
+
+            {isExpenseExpanded && (
+              <div className="mt-6 pt-4 border-t border-rose-100 space-y-3 animate-in slide-in-from-top-2">
+                {expenseCategoryData.map(cat => (
+                  <div key={cat.name} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center text-rose-500 shadow-sm">
+                        <CategoryIcon iconName={cat.icon} className="w-4 h-4" />
+                      </div>
+                      <span className="text-[11px] font-bold text-rose-900">{cat.name}</span>
+                    </div>
+                    <span className="text-[11px] font-black text-rose-600">€{cat.amount.toLocaleString('it-IT')}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* CHART TREND MENSILE */}
+      {chartData.length > 0 && (
+        <div className="bg-white rounded-[2.5rem] p-6 border theme-border shadow-sm">
+          <h3 className="text-[10px] font-black opacity-40 uppercase mb-6 tracking-widest">Trend Mensile</h3>
+          <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData}>
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#918B82', fontSize: 10, fontWeight: 900}} />
-                <Tooltip cursor={{fill: '#F1EBE3'}} contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.05)', fontWeight: 'bold' }} />
-                <Bar dataKey="income" fill="#10B981" radius={[6, 6, 6, 6]} barSize={14} />
-                <Bar dataKey="total" fill="#F43F5E" radius={[6, 6, 6, 6]} barSize={14} />
+                <Tooltip cursor={{fill: '#F1EBE3'}} />
+                <Bar dataKey="income" fill="#10B981" radius={[4, 4, 4, 4]} barSize={12} />
+                <Bar dataKey="total" fill="#F43F5E" radius={[4, 4, 4, 4]} barSize={12} />
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
-      )}
-
-      {isWidgetEnabled('pie') && (
-        <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border theme-border animate-in slide-in-from-bottom duration-500 hover:scale-[1.01] hover:shadow-md transition-all duration-300">
-          <h3 className="text-[10px] font-black opacity-60 uppercase mb-6 tracking-[0.15em]">Suddivisione Spese</h3>
-          <div className="h-56 w-full flex items-center justify-center relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={categoryData} innerRadius={60} outerRadius={85} paddingAngle={8} dataKey="value">
-                  {categoryData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-[9px] font-black opacity-60 uppercase tracking-widest">Totale</span>
-              <span className="text-2xl font-black text-[#4A453E] tracking-tighter">€{totalExpenses.toFixed(0)}</span>
-            </div>
-          </div>
-          <div className="mt-8 grid grid-cols-2 gap-x-4 gap-y-4">
-            {categoryData.slice(0, 4).map(c => (
-              <div key={c.name} className="flex flex-col p-3 rounded-2xl theme-sub-bg hover:bg-white hover:shadow-sm transition-all duration-300">
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: c.color }}></div>
-                  <span className="text-[10px] font-black opacity-60 uppercase truncate">{c.name}</span>
-                </div>
-                <span className="text-sm font-black text-[#4A453E]">€{c.value.toFixed(2)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      
-      {!enabledWidgets.length && (
-        <div className="py-20 text-center opacity-30 italic">
-          Dashboard vuota. Clicca su "Personalizza" per aggiungere moduli.
         </div>
       )}
     </div>

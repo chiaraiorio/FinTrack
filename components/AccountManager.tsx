@@ -8,6 +8,7 @@ interface AccountManagerProps {
   onAdd: (acc: Omit<Account, 'id'>) => void;
   onUpdate: (acc: Account) => void;
   onDelete: (id: string) => void;
+  onReorder: (accounts: Account[]) => void;
   hideBalances: boolean;
   onToggleHideBalances: () => void;
   onOpenSidebar: () => void;
@@ -18,44 +19,64 @@ interface AccountManagerProps {
   onMoveFunds: (amount: number, from: {type: 'acc' | 'card' | 'jar', id: string}, to: {type: 'acc' | 'card' | 'jar', id: string}, notes: string) => void;
 }
 
+const ACCOUNT_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#F43F5E', '#8B5CF6', '#06B6D4', '#8E7C68', '#4A453E'];
+
 const AccountManager: React.FC<AccountManagerProps> = ({ 
-  accounts, onAdd, onUpdate, onDelete, 
+  accounts, onAdd, onUpdate, onDelete, onReorder,
   hideBalances, onToggleHideBalances, onOpenSidebar,
   jars, onAddJar, onUpdateJar, onDeleteJar, onMoveFunds
 }) => {
   const [expandedAccountId, setExpandedAccountId] = useState<string | null>(null);
+  
+  // States per i Form
   const [showAccForm, setShowAccForm] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [showJarForm, setShowJarForm] = useState<string | null>(null);
-  const [showCardForm, setShowCardForm] = useState<string | null>(null);
+  const [showCardForm, setShowCardForm] = useState<{accId: string, card?: LinkedCard} | null>(null);
   const [activeTransfer, setActiveTransfer] = useState<{from: any, jar?: SavingsJar, card?: LinkedCard} | null>(null);
   
+  // Account Form Fields
   const [accName, setAccName] = useState('');
   const [accBalance, setAccBalance] = useState('');
   const [accType, setAccType] = useState<'Banca' | 'Contanti' | 'Carta' | 'Altro'>('Banca');
+  const [accColor, setAccColor] = useState(ACCOUNT_COLORS[0]);
   
-  const [jarName, setJarName] = useState('');
-  const [jarTarget, setJarTarget] = useState('');
-
+  // Card Form Fields
   const [cardName, setCardName] = useState('');
   const [cardBalance, setCardBalance] = useState('');
   const [cardType, setCardType] = useState<'Credito' | 'Prepagata' | 'Debito'>('Debito');
 
+  // Jar/Transfer Fields
+  const [jarName, setJarName] = useState('');
+  const [jarTarget, setJarTarget] = useState('');
   const [txAmount, setTxAmount] = useState('');
 
-  // Sincronizza il form se stiamo modificando un conto
   useEffect(() => {
     if (editingAccount) {
       setAccName(editingAccount.name);
       setAccBalance(editingAccount.balance.toString());
       setAccType(editingAccount.type);
+      setAccColor(editingAccount.color || ACCOUNT_COLORS[0]);
       setShowAccForm(true);
     } else {
       setAccName('');
       setAccBalance('');
       setAccType('Banca');
+      setAccColor(ACCOUNT_COLORS[0]);
     }
   }, [editingAccount]);
+
+  useEffect(() => {
+    if (showCardForm?.card) {
+      setCardName(showCardForm.card.name);
+      setCardBalance(showCardForm.card.balance.toString());
+      setCardType(showCardForm.card.type);
+    } else {
+      setCardName('');
+      setCardBalance('');
+      setCardType('Debito');
+    }
+  }, [showCardForm]);
 
   const handleAccSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,6 +88,7 @@ const AccountManager: React.FC<AccountManagerProps> = ({
         name: accName,
         balance: parseFloat(accBalance) || 0,
         type: accType,
+        color: accColor,
         updatedAt: Date.now()
       });
       setEditingAccount(null);
@@ -75,16 +97,16 @@ const AccountManager: React.FC<AccountManagerProps> = ({
         name: accName, 
         balance: parseFloat(accBalance) || 0, 
         type: accType, 
-        color: '#8E7C68', 
+        color: accColor, 
         cards: [], 
         updatedAt: Date.now() 
       });
     }
-    setAccName(''); setAccBalance(''); setShowAccForm(false);
+    setShowAccForm(false);
   };
 
   const handleDeleteAccount = (id: string) => {
-    if (window.confirm("Sei sicuro di voler eliminare questo conto? Tutti i dati associati (carte, salvadanai) andranno persi.")) {
+    if (window.confirm("Sei sicuro di voler eliminare questo conto? Tutti i dati associati andranno persi.")) {
       onDelete(id);
       setExpandedAccountId(null);
     }
@@ -93,11 +115,32 @@ const AccountManager: React.FC<AccountManagerProps> = ({
   const handleCardSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!cardName.trim() || !showCardForm) return;
-    const acc = accounts.find(a => a.id === showCardForm);
+    const acc = accounts.find(a => a.id === showCardForm.accId);
     if (!acc) return;
-    const newCard: LinkedCard = { id: crypto.randomUUID(), name: cardName, balance: parseFloat(cardBalance) || 0, type: cardType, updatedAt: Date.now() };
-    onUpdate({ ...acc, cards: [...acc.cards, newCard] });
-    setCardName(''); setCardBalance(''); setShowCardForm(null);
+
+    if (showCardForm.card) {
+      // Modifica carta esistente
+      const updatedCards = acc.cards.map(c => 
+        c.id === showCardForm.card?.id 
+        ? { ...c, name: cardName, balance: parseFloat(cardBalance) || 0, type: cardType, updatedAt: Date.now() }
+        : c
+      );
+      onUpdate({ ...acc, cards: updatedCards });
+    } else {
+      // Nuova carta
+      const newCard: LinkedCard = { id: crypto.randomUUID(), name: cardName, balance: parseFloat(cardBalance) || 0, type: cardType, updatedAt: Date.now() };
+      onUpdate({ ...acc, cards: [...acc.cards, newCard] });
+    }
+    setShowCardForm(null);
+  };
+
+  const handleDeleteCard = (accId: string, cardId: string) => {
+    if (window.confirm("Eliminare questa carta?")) {
+      const acc = accounts.find(a => a.id === accId);
+      if (acc) {
+        onUpdate({ ...acc, cards: acc.cards.filter(c => c.id !== cardId) });
+      }
+    }
   };
 
   const handleJarSubmit = (e: React.FormEvent) => {
@@ -105,6 +148,15 @@ const AccountManager: React.FC<AccountManagerProps> = ({
     if (!jarName.trim() || !jarTarget || !showJarForm) return;
     onAddJar({ name: jarName, targetAmount: parseFloat(jarTarget) || 0, currentAmount: 0, accountId: showJarForm, color: '#8E7C68', icon: 'briefcase', updatedAt: Date.now() });
     setJarName(''); setJarTarget(''); setShowJarForm(null);
+  };
+
+  const moveAccount = (index: number, direction: 'up' | 'down') => {
+    const newAccounts = [...accounts];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex >= 0 && targetIndex < accounts.length) {
+      [newAccounts[index], newAccounts[targetIndex]] = [newAccounts[targetIndex], newAccounts[index]];
+      onReorder(newAccounts);
+    }
   };
 
   const executeTransfer = (isToJar: boolean) => {
@@ -145,7 +197,7 @@ const AccountManager: React.FC<AccountManagerProps> = ({
       </header>
 
       <section className="space-y-4">
-        {accounts.map(a => {
+        {accounts.map((a, idx) => {
           const isExpanded = expandedAccountId === a.id;
           const accountJars = jars.filter(j => j.accountId === a.id);
           const totalAssets = a.balance + a.cards.reduce((s, c) => s + c.balance, 0) + accountJars.reduce((s, j) => s + j.currentAmount, 0);
@@ -153,16 +205,20 @@ const AccountManager: React.FC<AccountManagerProps> = ({
           return (
             <div key={a.id} className={`bg-white rounded-[2.5rem] border theme-border shadow-sm transition-all duration-300 ${isExpanded ? 'ring-2 theme-primary ring-opacity-20' : ''}`}>
               <div onClick={() => setExpandedAccountId(isExpanded ? null : a.id)} className="p-6 flex items-center justify-between cursor-pointer">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: a.color }}>
+                <div className="flex items-center gap-4 min-w-0 flex-1">
+                  <div className="flex flex-col gap-1 mr-1">
+                     <button onClick={(e) => { e.stopPropagation(); moveAccount(idx, 'up'); }} disabled={idx === 0} className="p-1 opacity-20 disabled:opacity-5 hover:opacity-100"><svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z"/></svg></button>
+                     <button onClick={(e) => { e.stopPropagation(); moveAccount(idx, 'down'); }} disabled={idx === accounts.length - 1} className="p-1 opacity-20 disabled:opacity-5 hover:opacity-100"><svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg></button>
+                  </div>
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg flex-shrink-0" style={{ backgroundColor: a.color }}>
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 truncate">
                     <h4 className="font-black text-[#4A453E] text-lg leading-tight truncate">{a.name}</h4>
-                    <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest">Patrimonio</p>
+                    <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest truncate">{a.type}</p>
                   </div>
                 </div>
-                <div className="text-right flex items-center gap-3">
+                <div className="text-right flex items-center gap-3 flex-shrink-0">
                   <div>
                     <p className="text-xl font-black text-[#4A453E] tracking-tight">{hideBalances ? '€ ••••' : `€${totalAssets.toLocaleString('it-IT')}`}</p>
                     <p className="text-[10px] font-bold theme-primary uppercase">{isExpanded ? 'Chiudi' : 'Espandi'}</p>
@@ -175,22 +231,9 @@ const AccountManager: React.FC<AccountManagerProps> = ({
 
               {isExpanded && (
                 <div className="px-6 pb-8 space-y-8 animate-in slide-in-from-top-4 border-t theme-border pt-6">
-                  {/* Azioni del conto */}
                   <div className="flex gap-2 justify-end">
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); setEditingAccount(a); }}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-white border theme-border rounded-xl text-[10px] font-black uppercase theme-primary shadow-sm active:scale-95 transition-all"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                      Modifica
-                    </button>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleDeleteAccount(a.id); }}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-rose-50 border border-rose-100 rounded-xl text-[10px] font-black uppercase text-rose-500 shadow-sm active:scale-95 transition-all"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      Elimina
-                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); setEditingAccount(a); }} className="flex items-center gap-1.5 px-4 py-2 bg-white border theme-border rounded-xl text-[10px] font-black uppercase theme-primary shadow-sm active:scale-95 transition-all"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>Modifica</button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteAccount(a.id); }} className="flex items-center gap-1.5 px-4 py-2 bg-rose-50 border border-rose-100 rounded-xl text-[10px] font-black uppercase text-rose-500 shadow-sm active:scale-95 transition-all"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>Elimina</button>
                   </div>
 
                   <div className="bg-gray-50 p-5 rounded-3xl flex items-center justify-between border theme-border">
@@ -198,9 +241,7 @@ const AccountManager: React.FC<AccountManagerProps> = ({
                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center theme-primary shadow-sm">
                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                        </div>
-                       <div>
-                         <p className="text-xs font-black text-[#4A453E]">Disponibilità</p>
-                       </div>
+                       <p className="text-xs font-black text-[#4A453E]">Disponibilità Conto</p>
                     </div>
                     <p className="text-lg font-black text-[#4A453E]">€{a.balance.toLocaleString('it-IT')}</p>
                   </div>
@@ -208,7 +249,7 @@ const AccountManager: React.FC<AccountManagerProps> = ({
                   <div className="space-y-4">
                     <div className="flex justify-between items-center px-1">
                       <h5 className="text-[10px] font-black opacity-50 uppercase tracking-widest">Carte Collegate</h5>
-                      <button onClick={() => setShowCardForm(a.id)} className="text-[10px] font-black uppercase theme-primary">+ Aggiungi</button>
+                      <button onClick={() => setShowCardForm({accId: a.id})} className="text-[10px] font-black uppercase theme-primary">+ Aggiungi</button>
                     </div>
                     <div className="grid grid-cols-1 gap-3">
                       {a.cards.map(card => (
@@ -222,11 +263,11 @@ const AccountManager: React.FC<AccountManagerProps> = ({
                               <p className="text-[9px] font-bold opacity-40 uppercase">{card.type}</p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-4 flex-shrink-0">
-                            <p className="text-sm font-black text-[#4A453E]">€{card.balance.toLocaleString('it-IT')}</p>
-                            <button onClick={() => setActiveTransfer({from: a.id, card: card})} className="p-2 theme-primary bg-white rounded-lg shadow-sm active:scale-90 transition-transform">
-                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
-                            </button>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <p className="text-sm font-black text-[#4A453E] mr-2">€{card.balance.toLocaleString('it-IT')}</p>
+                            <button onClick={() => setShowCardForm({accId: a.id, card: card})} className="p-2 bg-white text-blue-500 rounded-lg shadow-sm hover:bg-blue-50"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
+                            <button onClick={() => handleDeleteCard(a.id, card.id)} className="p-2 bg-white text-rose-500 rounded-lg shadow-sm hover:bg-rose-50"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+                            <button onClick={() => setActiveTransfer({from: a.id, card: card})} className="p-2 theme-primary bg-white rounded-lg shadow-sm active:scale-90 transition-transform"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg></button>
                           </div>
                         </div>
                       ))}
@@ -250,12 +291,7 @@ const AccountManager: React.FC<AccountManagerProps> = ({
                                 </div>
                                 <span className="text-xs font-black text-[#4A453E] truncate">{jar.name}</span>
                               </div>
-                              <button 
-                                onClick={() => setActiveTransfer({from: a.id, jar: jar})} 
-                                className="px-2 py-1 bg-white rounded-lg text-[7px] font-black theme-primary uppercase tracking-tighter shadow-sm active:scale-95 border theme-border flex-shrink-0"
-                              >
-                                Sposta
-                              </button>
+                              <button onClick={() => setActiveTransfer({from: a.id, jar: jar})} className="px-2 py-1 bg-white rounded-lg text-[7px] font-black theme-primary uppercase tracking-tighter shadow-sm active:scale-95 border theme-border flex-shrink-0">Sposta</button>
                             </div>
                             <div className="space-y-1.5 px-1">
                               <div className="flex justify-between items-baseline">
@@ -280,7 +316,7 @@ const AccountManager: React.FC<AccountManagerProps> = ({
 
       {showAccForm && (
         <div className="fixed inset-0 bg-[#4A453E]/40 backdrop-blur-sm z-[110] flex items-center justify-center p-6 animate-in fade-in duration-300">
-          <form onSubmit={handleAccSubmit} className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl space-y-6 animate-in zoom-in duration-300">
+          <form onSubmit={handleAccSubmit} className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl space-y-6 animate-in zoom-in duration-300 max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-black text-center text-[#4A453E]">{editingAccount ? 'Modifica Conto' : 'Nuovo Conto'}</h3>
             <div className="space-y-4">
               <div className="space-y-1">
@@ -300,11 +336,17 @@ const AccountManager: React.FC<AccountManagerProps> = ({
                   <option value="Altro">Altro</option>
                 </select>
               </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black opacity-30 uppercase ml-2 tracking-widest">Colore</label>
+                <div className="grid grid-cols-4 gap-2">
+                   {ACCOUNT_COLORS.map(c => (
+                     <button type="button" key={c} onClick={() => setAccColor(c)} className={`w-full aspect-square rounded-xl border-4 ${accColor === c ? 'border-white shadow-lg' : 'border-transparent'}`} style={{ backgroundColor: c }} />
+                   ))}
+                </div>
+              </div>
             </div>
             <div className="flex gap-2">
-              <button type="submit" className="flex-1 py-4 theme-bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all">
-                {editingAccount ? 'Aggiorna' : 'Crea'}
-              </button>
+              <button type="submit" className="flex-1 py-4 theme-bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all">{editingAccount ? 'Aggiorna' : 'Crea'}</button>
               <button type="button" onClick={() => { setShowAccForm(false); setEditingAccount(null); }} className="px-6 py-4 theme-sub-bg text-[#918B82] rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all">Annulla</button>
             </div>
           </form>
@@ -314,10 +356,10 @@ const AccountManager: React.FC<AccountManagerProps> = ({
       {showCardForm && (
         <div className="fixed inset-0 bg-[#4A453E]/40 backdrop-blur-sm z-[110] flex items-center justify-center p-6">
           <form onSubmit={handleCardSubmit} className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl space-y-6">
-            <h3 className="text-xl font-black text-center text-[#4A453E]">Aggiungi Carta</h3>
+            <h3 className="text-xl font-black text-center text-[#4A453E]">{showCardForm.card ? 'Modifica Carta' : 'Aggiungi Carta'}</h3>
             <div className="space-y-4">
               <input type="text" placeholder="Nome Carta" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={cardName} onChange={e => setCardName(e.target.value)} required />
-              <input type="number" placeholder="Saldo Attuale" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={cardBalance} onChange={e => setCardBalance(e.target.value)} required />
+              <input type="number" step="0.01" placeholder="Saldo Attuale" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={cardBalance} onChange={e => setCardBalance(e.target.value)} required />
               <select className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={cardType} onChange={e => setCardType(e.target.value as any)}>
                 <option value="Debito">Debito</option>
                 <option value="Prepagata">Prepagata</option>
@@ -325,7 +367,7 @@ const AccountManager: React.FC<AccountManagerProps> = ({
               </select>
             </div>
             <div className="flex gap-2">
-              <button type="submit" className="flex-1 py-4 theme-bg-primary text-white rounded-2xl font-black text-sm">Aggiungi</button>
+              <button type="submit" className="flex-1 py-4 theme-bg-primary text-white rounded-2xl font-black text-sm">{showCardForm.card ? 'Salva' : 'Aggiungi'}</button>
               <button type="button" onClick={() => setShowCardForm(null)} className="px-6 py-4 theme-sub-bg text-[#918B82] rounded-2xl font-black text-sm">Indietro</button>
             </div>
           </form>

@@ -155,13 +155,16 @@ const App: React.FC = () => {
   };
 
   const handleSaveTransfer = (amount: number, fromId: string, toId: string, notes: string, date: string) => {
+    const fromAcc = accounts.find(a => a.id === fromId);
+    const toAcc = accounts.find(a => a.id === toId);
+
     const transferExpense: Expense = {
       id: crypto.randomUUID(),
       amount,
       categoryId: 'internal_transfer',
       accountId: fromId,
       date,
-      notes: notes || `Trasferimento verso ${accounts.find(a => a.id === toId)?.name}`,
+      notes: notes || `Trasferimento verso ${toAcc?.name}`,
       repeatability: Repeatability.NONE,
       isInternalTransfer: true,
       updatedAt: Date.now()
@@ -173,7 +176,7 @@ const App: React.FC = () => {
       accountId: toId,
       categoryId: 'internal_transfer',
       date,
-      notes: notes || `Trasferimento da ${accounts.find(a => a.id === fromId)?.name}`,
+      notes: notes || `Trasferimento da ${fromAcc?.name}`,
       isInternalTransfer: true,
       fromAccountId: fromId,
       updatedAt: Date.now()
@@ -189,6 +192,10 @@ const App: React.FC = () => {
     }));
 
     setIsTransferFormOpen(false);
+  };
+
+  const handleReorderAccounts = (newAccounts: Account[]) => {
+    setAccounts(newAccounts);
   };
 
   const handleImportTransactions = (transactions: any[]) => {
@@ -222,7 +229,7 @@ const App: React.FC = () => {
       case 'dashboard':
         return <Dashboard expenses={expenses} incomes={incomes} categories={categories} accounts={accounts} incomeCategories={incomeCategories} onOpenSidebar={() => setIsSidebarOpen(true)} onNavigate={navigateTo} savingsJars={savingsJars} />;
       case 'accounts':
-        return <AccountManager accounts={accounts} onAdd={a => setAccounts([...accounts, { ...a, id: crypto.randomUUID(), updatedAt: Date.now() }])} onUpdate={a => setAccounts(accounts.map(acc => acc.id === a.id ? a : acc))} onDelete={id => setAccounts(accounts.filter(a => a.id !== id))} hideBalances={hideBalances} onToggleHideBalances={() => setHideBalances(!hideBalances)} onOpenSidebar={() => setIsSidebarOpen(true)} jars={savingsJars} onAddJar={j => setSavingsJars([...savingsJars, { ...j, id: crypto.randomUUID(), updatedAt: Date.now() }])} onUpdateJar={j => setSavingsJars(savingsJars.map(jar => jar.id === j.id ? j : jar))} onDeleteJar={id => setSavingsJars(savingsJars.filter(j => j.id !== id))} onMoveFunds={() => {}} />;
+        return <AccountManager accounts={accounts} onAdd={a => setAccounts([...accounts, { ...a, id: crypto.randomUUID(), updatedAt: Date.now() }])} onUpdate={a => setAccounts(accounts.map(acc => acc.id === a.id ? a : acc))} onDelete={id => setAccounts(accounts.filter(a => a.id !== id))} onReorder={handleReorderAccounts} hideBalances={hideBalances} onToggleHideBalances={() => setHideBalances(!hideBalances)} onOpenSidebar={() => setIsSidebarOpen(true)} jars={savingsJars} onAddJar={j => setSavingsJars([...savingsJars, { ...j, id: crypto.randomUUID(), updatedAt: Date.now() }])} onUpdateJar={j => setSavingsJars(savingsJars.map(jar => jar.id === j.id ? j : jar))} onDeleteJar={id => setSavingsJars(savingsJars.filter(j => j.id !== id))} onMoveFunds={() => {}} />;
       case 'list':
         return <ExpenseList expenses={expenses} categories={categories} accounts={accounts} onOpenSidebar={() => setIsSidebarOpen(true)} onNavigate={navigateTo} onDeleteExpense={id => setExpenses(expenses.filter(e => e.id !== id))} onEditExpense={() => {}} language={settings.language} showDecimals={settings.showDecimals} hideBalances={hideBalances} />;
       case 'income_list':
@@ -256,7 +263,6 @@ const App: React.FC = () => {
         <>
           <div className="fixed inset-0 bg-black/5 z-[40]" onClick={() => setIsActionMenuOpen(false)} />
           <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex flex-col gap-3 z-[50] animate-in slide-in-from-bottom-4 duration-300 items-center">
-            {/* ORDINE: TRASFERIMENTO -> ENTRATA -> USCITA */}
             <button 
               onClick={() => { setIsTransferFormOpen(true); setIsActionMenuOpen(false); }}
               className="flex items-center gap-2 bg-sky-500 text-white px-5 py-3.5 rounded-2xl shadow-xl whitespace-nowrap font-black text-xs uppercase tracking-widest active:scale-95 transition-all"
@@ -273,7 +279,7 @@ const App: React.FC = () => {
             </button>
             <button 
               onClick={() => { setIsFormOpen(true); setIsActionMenuOpen(false); }}
-              className="flex items-center gap-2 bg-rose-500 text-white px-5 py-3.5 rounded-2xl shadow-xl whitespace-nowrap font-black text-xs uppercase tracking-widest active:scale-95 transition-all"
+              className="flex items-center gap-2 bg-red-600 text-white px-5 py-3.5 rounded-2xl shadow-xl whitespace-nowrap font-black text-xs uppercase tracking-widest active:scale-95 transition-all"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M20 12H4" /></svg>
               Nuova Uscita

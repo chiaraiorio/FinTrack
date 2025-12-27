@@ -71,7 +71,7 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
           <svg className="w-6 h-6 theme-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16m-7 6h7" /></svg>
         </button>
         <h1 className="text-xl font-black text-[#4A453E]">Le mie Uscite</h1>
-        <button onClick={handleExport} className="w-10 h-10 theme-card rounded-xl flex items-center justify-center text-rose-500">
+        <button onClick={handleExport} className="w-10 h-10 theme-card rounded-xl flex items-center justify-center text-red-500">
            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
         </button>
       </header>
@@ -98,7 +98,7 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
           const cat = categories.find(c => c.id === e.categoryId);
           return (
             <div key={e.id} className="p-4 rounded-3xl flex items-center gap-4 border theme-border shadow-sm bg-white active:scale-95 transition-all">
-              <div className="w-11 h-11 rounded-2xl flex items-center justify-center bg-rose-50 text-rose-500">
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center bg-red-50 text-red-500">
                 <CategoryIcon iconName={cat?.icon || 'generic'} className="w-5 h-5" />
               </div>
               <div className="flex-1 min-w-0">
@@ -106,8 +106,8 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
                 <p className="text-[9px] font-bold opacity-40 uppercase tracking-widest">{accounts.find(a => a.id === e.accountId)?.name} • {e.date}</p>
               </div>
               <div className="text-right">
-                <p className="font-black text-rose-500 text-sm">-{hideBalances ? '€ ••' : `€${e.amount.toLocaleString('it-IT')}`}</p>
-                <button onClick={() => onDeleteExpense(e.id)} className="text-[8px] font-bold uppercase text-rose-300">Elimina</button>
+                <p className="font-black text-red-600 text-sm">-{hideBalances ? '€ ••' : `€${e.amount.toLocaleString('it-IT')}`}</p>
+                <button onClick={() => onDeleteExpense(e.id)} className="text-[8px] font-bold uppercase text-red-300">Elimina</button>
               </div>
             </div>
           );

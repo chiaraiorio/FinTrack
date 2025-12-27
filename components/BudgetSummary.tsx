@@ -58,33 +58,33 @@ const BudgetSummary: React.FC<BudgetSummaryProps> = ({
       </header>
 
       <div className="space-y-10">
-        {/* USCITE */}
+        {/* USCITE (ROSSO) */}
         <section className="space-y-4">
           <div className="flex items-center gap-3 px-2">
-            <div className="w-1.5 h-6 bg-rose-500 rounded-full"></div>
+            <div className="w-1.5 h-6 bg-red-600 rounded-full"></div>
             <h2 className="text-sm font-black text-[#4A453E] uppercase tracking-widest">Categorie Uscite</h2>
           </div>
           <div className="grid grid-cols-1 gap-3">
             {expenseStats.map(stat => (
               <div key={stat.id} className="bg-white p-4 rounded-[2rem] border theme-border shadow-sm flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="w-11 h-11 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-500 flex-shrink-0">
-                    <CategoryIcon iconName={stat.icon} className="w-5 h-5" color="#F43F5E" />
+                  <div className="w-11 h-11 rounded-2xl bg-red-50 flex items-center justify-center text-red-600 flex-shrink-0">
+                    <CategoryIcon iconName={stat.icon} className="w-5 h-5" color="#DC2626" />
                   </div>
                   <div className="truncate">
                     <h3 className="font-black text-[#4A453E] text-sm truncate">{stat.name}</h3>
-                    <p className="text-[10px] font-bold text-rose-500/60 uppercase">Speso: €{stat.spent.toLocaleString('it-IT')}</p>
+                    <p className="text-[10px] font-bold text-red-600/60 uppercase">Speso: €{stat.spent.toLocaleString('it-IT')}</p>
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                  <div className="flex items-center gap-1.5 bg-rose-50/30 px-3 py-2 rounded-xl border border-rose-100">
-                    <span className="text-[9px] font-black text-rose-300">€</span>
+                  <div className="flex items-center gap-1.5 bg-red-50/30 px-3 py-2 rounded-xl border border-red-100">
+                    <span className="text-[9px] font-black text-red-300">€</span>
                     <input 
                         type="number"
                         value={stat.budget || ''}
                         onChange={(e) => handleExpenseBudgetChange(stat, e.target.value)}
                         placeholder="Budget"
-                        className="w-16 bg-transparent text-right font-black text-rose-500 outline-none text-xs placeholder:text-rose-200"
+                        className="w-16 bg-transparent text-right font-black text-red-600 outline-none text-xs placeholder:text-red-200"
                     />
                   </div>
                 </div>

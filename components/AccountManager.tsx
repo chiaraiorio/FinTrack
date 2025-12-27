@@ -25,6 +25,7 @@ const AccountManager: React.FC<AccountManagerProps> = ({
 }) => {
   const [expandedAccountId, setExpandedAccountId] = useState<string | null>(null);
   const [showAccForm, setShowAccForm] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [showJarForm, setShowJarForm] = useState<string | null>(null);
   const [showCardForm, setShowCardForm] = useState<string | null>(null);
   const [activeTransfer, setActiveTransfer] = useState<{from: any, jar?: SavingsJar, card?: LinkedCard} | null>(null);
@@ -42,11 +43,51 @@ const AccountManager: React.FC<AccountManagerProps> = ({
 
   const [txAmount, setTxAmount] = useState('');
 
+  // Sincronizza il form se stiamo modificando un conto
+  useEffect(() => {
+    if (editingAccount) {
+      setAccName(editingAccount.name);
+      setAccBalance(editingAccount.balance.toString());
+      setAccType(editingAccount.type);
+      setShowAccForm(true);
+    } else {
+      setAccName('');
+      setAccBalance('');
+      setAccType('Banca');
+    }
+  }, [editingAccount]);
+
   const handleAccSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!accName.trim()) return;
-    onAdd({ name: accName, balance: parseFloat(accBalance) || 0, type: accType, color: '#8E7C68', cards: [], updatedAt: Date.now() });
+    
+    if (editingAccount) {
+      onUpdate({
+        ...editingAccount,
+        name: accName,
+        balance: parseFloat(accBalance) || 0,
+        type: accType,
+        updatedAt: Date.now()
+      });
+      setEditingAccount(null);
+    } else {
+      onAdd({ 
+        name: accName, 
+        balance: parseFloat(accBalance) || 0, 
+        type: accType, 
+        color: '#8E7C68', 
+        cards: [], 
+        updatedAt: Date.now() 
+      });
+    }
     setAccName(''); setAccBalance(''); setShowAccForm(false);
+  };
+
+  const handleDeleteAccount = (id: string) => {
+    if (window.confirm("Sei sicuro di voler eliminare questo conto? Tutti i dati associati (carte, salvadanai) andranno persi.")) {
+      onDelete(id);
+      setExpandedAccountId(null);
+    }
   };
 
   const handleCardSubmit = (e: React.FormEvent) => {
@@ -54,7 +95,6 @@ const AccountManager: React.FC<AccountManagerProps> = ({
     if (!cardName.trim() || !showCardForm) return;
     const acc = accounts.find(a => a.id === showCardForm);
     if (!acc) return;
-    // Added updatedAt property to satisfy LinkedCard type
     const newCard: LinkedCard = { id: crypto.randomUUID(), name: cardName, balance: parseFloat(cardBalance) || 0, type: cardType, updatedAt: Date.now() };
     onUpdate({ ...acc, cards: [...acc.cards, newCard] });
     setCardName(''); setCardBalance(''); setShowCardForm(null);
@@ -98,7 +138,7 @@ const AccountManager: React.FC<AccountManagerProps> = ({
         </div>
         <div className="flex justify-between items-end">
           <h1 className="text-4xl font-black text-[#4A453E] tracking-tight">I miei Conti</h1>
-          <button onClick={() => setShowAccForm(true)} className="theme-bg-primary text-white p-2.5 rounded-2xl shadow-lg active:scale-95 transition-all">
+          <button onClick={() => { setEditingAccount(null); setShowAccForm(true); }} className="theme-bg-primary text-white p-2.5 rounded-2xl shadow-lg active:scale-95 transition-all">
              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
           </button>
         </div>
@@ -117,8 +157,8 @@ const AccountManager: React.FC<AccountManagerProps> = ({
                   <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: a.color }}>
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
                   </div>
-                  <div>
-                    <h4 className="font-black text-[#4A453E] text-lg leading-tight">{a.name}</h4>
+                  <div className="min-w-0">
+                    <h4 className="font-black text-[#4A453E] text-lg leading-tight truncate">{a.name}</h4>
                     <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest">Patrimonio</p>
                   </div>
                 </div>
@@ -135,6 +175,24 @@ const AccountManager: React.FC<AccountManagerProps> = ({
 
               {isExpanded && (
                 <div className="px-6 pb-8 space-y-8 animate-in slide-in-from-top-4 border-t theme-border pt-6">
+                  {/* Azioni del conto */}
+                  <div className="flex gap-2 justify-end">
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setEditingAccount(a); }}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-white border theme-border rounded-xl text-[10px] font-black uppercase theme-primary shadow-sm active:scale-95 transition-all"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                      Modifica
+                    </button>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleDeleteAccount(a.id); }}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-rose-50 border border-rose-100 rounded-xl text-[10px] font-black uppercase text-rose-500 shadow-sm active:scale-95 transition-all"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      Elimina
+                    </button>
+                  </div>
+
                   <div className="bg-gray-50 p-5 rounded-3xl flex items-center justify-between border theme-border">
                     <div className="flex items-center gap-4">
                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center theme-primary shadow-sm">
@@ -221,21 +279,33 @@ const AccountManager: React.FC<AccountManagerProps> = ({
       </section>
 
       {showAccForm && (
-        <div className="fixed inset-0 bg-[#4A453E]/40 backdrop-blur-sm z-[110] flex items-center justify-center p-6">
-          <form onSubmit={handleAccSubmit} className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl space-y-6">
-            <h3 className="text-xl font-black text-center text-[#4A453E]">Nuovo Conto</h3>
+        <div className="fixed inset-0 bg-[#4A453E]/40 backdrop-blur-sm z-[110] flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <form onSubmit={handleAccSubmit} className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl space-y-6 animate-in zoom-in duration-300">
+            <h3 className="text-xl font-black text-center text-[#4A453E]">{editingAccount ? 'Modifica Conto' : 'Nuovo Conto'}</h3>
             <div className="space-y-4">
-              <input type="text" placeholder="Nome Banca" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={accName} onChange={e => setAccName(e.target.value)} required />
-              <input type="number" placeholder="Saldo Iniziale" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={accBalance} onChange={e => setAccBalance(e.target.value)} required />
-              <select className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={accType} onChange={e => setAccType(e.target.value as any)}>
-                <option value="Banca">Banca</option>
-                <option value="Contanti">Contanti</option>
-                <option value="Carta">Prepagata</option>
-              </select>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black opacity-30 uppercase ml-2 tracking-widest">Nome Conto</label>
+                <input type="text" placeholder="Es. Banca Intesa" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none border theme-border" value={accName} onChange={e => setAccName(e.target.value)} required />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black opacity-30 uppercase ml-2 tracking-widest">Saldo (€)</label>
+                <input type="number" step="0.01" placeholder="0.00" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none border theme-border" value={accBalance} onChange={e => setAccBalance(e.target.value)} required />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black opacity-30 uppercase ml-2 tracking-widest">Tipologia</label>
+                <select className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none border theme-border" value={accType} onChange={e => setAccType(e.target.value as any)}>
+                  <option value="Banca">Banca</option>
+                  <option value="Contanti">Contanti</option>
+                  <option value="Carta">Prepagata</option>
+                  <option value="Altro">Altro</option>
+                </select>
+              </div>
             </div>
             <div className="flex gap-2">
-              <button type="submit" className="flex-1 py-4 theme-bg-primary text-white rounded-2xl font-black text-sm">Crea</button>
-              <button type="button" onClick={() => setShowAccForm(false)} className="px-6 py-4 theme-sub-bg text-[#918B82] rounded-2xl font-black text-sm">Chiudi</button>
+              <button type="submit" className="flex-1 py-4 theme-bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all">
+                {editingAccount ? 'Aggiorna' : 'Crea'}
+              </button>
+              <button type="button" onClick={() => { setShowAccForm(false); setEditingAccount(null); }} className="px-6 py-4 theme-sub-bg text-[#918B82] rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all">Annulla</button>
             </div>
           </form>
         </div>
@@ -280,7 +350,7 @@ const AccountManager: React.FC<AccountManagerProps> = ({
 
       {activeTransfer && (
         <div className="fixed inset-0 bg-[#4A453E]/40 backdrop-blur-sm z-[120] flex items-center justify-center p-6 animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-xs rounded-[2.5rem] p-8 shadow-2xl space-y-6">
+          <div className="bg-white w-full max-w-xs rounded-[2.5rem] p-8 shadow-2xl space-y-6 animate-in zoom-in duration-300">
             <div className="text-center">
               <h3 className="text-xl font-black text-[#4A453E]">Trasferisci</h3>
               <p className="text-[10px] text-[#918B82] font-black uppercase mt-1 tracking-widest">{activeTransfer.jar?.name || activeTransfer.card?.name}</p>

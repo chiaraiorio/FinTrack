@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { Expense, Category, Account } from "../types";
 
@@ -8,31 +9,41 @@ export const getFinancialAdvice = async (
 ): Promise<string> => {
   if (expenses.length === 0) return "Inizia ad aggiungere spese per ricevere consigli personalizzati!";
 
-  // Fix: Initialize GoogleGenAI inside the function to ensure up-to-date API key usage from process.env.API_KEY
+  // Inizializzazione conforme alle linee guida
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-  const expenseData = expenses.map(e => ({
+  // Sintesi dei dati per il prompt
+  const expenseData = expenses.slice(0, 50).map(e => ({
     amount: e.amount,
     date: e.date,
-    category: categories.find(c => c.id === e.categoryId)?.name || 'Sconosciuta'
+    category: categories.find(c => c.id === e.categoryId)?.name || 'Altro'
   }));
 
+  const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0);
+
   const prompt = `
-    Agisci come un consulente finanziario esperto. Analizza le seguenti spese e fornisci un breve riassunto (massimo 100 parole)
-    con 3 suggerimenti pratici per risparmiare.
-    Spese: ${JSON.stringify(expenseData)}
-    Rispondi in italiano in modo amichevole e professionale.
+    Agisci come un consulente finanziario esperto. Analizza la situazione di questo utente:
+    - Saldo Totale: €${totalBalance.toFixed(2)}
+    - Ultime Spese: ${JSON.stringify(expenseData)}
+    
+    Fornisci un breve riassunto (massimo 100 parole) con 3 suggerimenti pratici e specifici per risparmiare basandoti su questi dati.
+    Rispondi in italiano in modo amichevole.
   `;
 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: prompt,
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        temperature: 0.7,
+        topP: 0.95,
+      }
     });
-    // Fix: Access .text property directly (not a method) as per SDK specifications
+    
+    // Accesso diretto alla proprietà .text come richiesto
     return response.text || "Non è stato possibile generare un'analisi al momento.";
   } catch (error) {
     console.error("Gemini Error:", error);
-    return "Analisi intelligente non disponibile. Controlla la tua connessione.";
+    return "L'assistente AI non è riuscito a elaborare i dati. Verifica la configurazione della chiave API.";
   }
 };

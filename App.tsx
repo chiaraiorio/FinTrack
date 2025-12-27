@@ -19,7 +19,8 @@ import IncomeList from './components/IncomeList.tsx';
 import ExpenseList from './components/ExpenseList.tsx';
 import AiAdvisor from './components/AiAdvisor.tsx';
 import SearchView from './components/SearchView.tsx';
-import { Expense, Income, Category, Account, ViewType, Repeatability, User, IncomeCategory, Language, AppSettings } from './types.ts';
+import SavingsJarManager from './components/SavingsJarManager.tsx';
+import { Expense, Income, Category, Account, ViewType, Repeatability, User, IncomeCategory, Language, AppSettings, SavingsJar } from './types.ts';
 import { INITIAL_CATEGORIES, INITIAL_ACCOUNTS, INITIAL_INCOME_CATEGORIES } from './constants.ts';
 
 export type ThemePalette = {
@@ -72,6 +73,7 @@ const App: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
   const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>(INITIAL_INCOME_CATEGORIES);
   const [accounts, setAccounts] = useState<Account[]>(INITIAL_ACCOUNTS);
+  const [savingsJars, setSavingsJars] = useState<SavingsJar[]>([]);
   const [hideBalances, setHideBalances] = useState(localStorage.getItem('hide_balances') === 'true');
 
   // --- FORMS STATE ---
@@ -97,7 +99,8 @@ const App: React.FC = () => {
         incomes: getUserKey('incomes'),
         categories: getUserKey('categories'),
         income_categories: getUserKey('income_categories'),
-        accounts: getUserKey('accounts')
+        accounts: getUserKey('accounts'),
+        savings_jars: getUserKey('savings_jars')
       };
 
       const load = (key: string | null, fallback: any) => {
@@ -111,6 +114,7 @@ const App: React.FC = () => {
       setCategories(load(keys.categories, INITIAL_CATEGORIES));
       setIncomeCategories(load(keys.income_categories, INITIAL_INCOME_CATEGORIES));
       setAccounts(load(keys.accounts, INITIAL_ACCOUNTS));
+      setSavingsJars(load(keys.savings_jars, []));
     }
   }, [currentUser, getUserKey]);
 
@@ -125,7 +129,8 @@ const App: React.FC = () => {
     save(getUserKey('categories'), categories);
     save(getUserKey('income_categories'), incomeCategories);
     save(getUserKey('accounts'), accounts);
-  }, [expenses, incomes, categories, incomeCategories, accounts, currentUser, getUserKey]);
+    save(getUserKey('savings_jars'), savingsJars);
+  }, [expenses, incomes, categories, incomeCategories, accounts, savingsJars, currentUser, getUserKey]);
 
   // Sincronizzazione profilo utente nel database locale
   useEffect(() => {
@@ -173,10 +178,10 @@ const App: React.FC = () => {
   const handleLogout = () => {
     setCurrentUser(null);
     setViewHistory(['auth']);
-    // Reset data state per sicurezza visuale immediata
     setExpenses([]);
     setIncomes([]);
     setAccounts(INITIAL_ACCOUNTS);
+    setSavingsJars([]);
   };
 
   const handleSaveExpense = (newExpense: Omit<Expense, 'id'>) => {
@@ -245,7 +250,7 @@ const App: React.FC = () => {
     switch (view) {
       case 'dashboard':
       case 'financial_analysis':
-        return <Dashboard expenses={expenses} incomes={incomes} categories={categories} accounts={accounts} onOpenSidebar={() => setIsSidebarOpen(true)} isDetailed={view === 'financial_analysis'} onBack={goBack} onNavigate={navigateTo} />;
+        return <Dashboard expenses={expenses} incomes={incomes} categories={categories} accounts={accounts} onOpenSidebar={() => setIsSidebarOpen(true)} isDetailed={view === 'financial_analysis'} onBack={goBack} onNavigate={navigateTo} savingsJars={savingsJars} />;
       case 'categories':
         return <CategoryManager categories={categories} onAdd={(c) => setCategories([...categories, { ...c, id: crypto.randomUUID() }])} onUpdate={(c) => setCategories(categories.map(cat => cat.id === c.id ? c : cat))} onDelete={(id) => setCategories(categories.filter(c => c.id !== id))} onBack={goBack} onOpenSidebar={() => setIsSidebarOpen(true)} />;
       case 'income_categories':
@@ -268,6 +273,8 @@ const App: React.FC = () => {
         return <AiAdvisor expenses={expenses} categories={categories} accounts={accounts} onOpenSidebar={() => setIsSidebarOpen(true)} language={language} />;
       case 'search':
         return <SearchView expenses={expenses} incomes={incomes} categories={categories} incomeCategories={incomeCategories} accounts={accounts} onBack={goBack} onNavigate={navigateTo} language={language} showDecimals={userSettings.showDecimals} hideBalances={hideBalances} />;
+      case 'savings_jars':
+        return <SavingsJarManager accounts={accounts} jars={savingsJars} onAdd={(j) => setSavingsJars([...savingsJars, { ...j, id: crypto.randomUUID() }])} onUpdate={(j) => setSavingsJars(savingsJars.map(jar => jar.id === j.id ? j : jar))} onDelete={(id) => setSavingsJars(savingsJars.filter(j => j.id !== id))} onBack={goBack} onOpenSidebar={() => setIsSidebarOpen(true)} />;
       case 'list':
       default:
         return <ExpenseList expenses={expenses} categories={categories} accounts={accounts} onOpenSidebar={() => setIsSidebarOpen(true)} selectedMonth={selectedMonth} selectedYear={selectedYear} onPrevMonth={() => { if (selectedMonth === 0) { setSelectedMonth(11); setSelectedYear(selectedYear - 1); } else { setSelectedMonth(selectedMonth - 1); } }} onNextMonth={() => { if (selectedMonth === 11) { setSelectedMonth(0); setSelectedYear(selectedYear + 1); } else { setSelectedMonth(selectedMonth + 1); } }} hideBalances={hideBalances} onToggleHideBalances={() => setHideBalances(!hideBalances)} onNavigate={navigateTo} onDeleteExpense={handleDeleteExpense} language={language} showDecimals={userSettings.showDecimals} />;

@@ -53,6 +53,16 @@ export interface Account {
   linkedCardName?: string;
 }
 
+export interface SavingsJar {
+  id: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  accountId: string;
+  color: string;
+  icon: string;
+}
+
 export interface Expense {
   id: string;
   amount: number;
@@ -76,4 +86,4 @@ export interface Income {
   notes: string;
 }
 
-export type ViewType = 'list' | 'dashboard' | 'categories' | 'accounts' | 'settings' | 'export' | 'monthly_reports' | 'auth' | 'profile' | 'security' | 'financial_analysis' | 'income_list' | 'income_categories' | 'ai_advisor' | 'search';
+export type ViewType = 'list' | 'dashboard' | 'categories' | 'accounts' | 'settings' | 'export' | 'monthly_reports' | 'auth' | 'profile' | 'security' | 'financial_analysis' | 'income_list' | 'income_categories' | 'ai_advisor' | 'search' | 'savings_jars';

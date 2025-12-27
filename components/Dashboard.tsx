@@ -1,7 +1,8 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Expense, Income, Category, Account, ViewType } from '../types';
+import { Expense, Income, Category, Account, ViewType, SavingsJar } from '../types';
+import CategoryIcon from './CategoryIcon';
 
 interface DashboardProps {
   expenses: Expense[];
@@ -12,17 +13,19 @@ interface DashboardProps {
   isDetailed?: boolean;
   onBack?: () => void;
   onNavigate?: (view: ViewType) => void;
+  savingsJars?: SavingsJar[];
 }
 
 const WIDGETS = [
   { id: 'liquidity', label: 'Liquidità Totale', icon: '💰' },
   { id: 'summary', label: 'Riepilogo Bilancio', icon: '📊' },
+  { id: 'savings', label: 'Obiettivi Risparmio', icon: '🎯' },
   { id: 'comparison', label: 'Confronto Performance', icon: '📈' },
   { id: 'trend', label: 'Trend Temporale', icon: '📉' },
   { id: 'pie', label: 'Suddivisione Categorie', icon: '🥧' }
 ];
 
-const Dashboard: React.FC<DashboardProps> = ({ expenses, incomes, categories, accounts, onOpenSidebar, isDetailed = false, onBack, onNavigate }) => {
+const Dashboard: React.FC<DashboardProps> = ({ expenses, incomes, categories, accounts, onOpenSidebar, isDetailed = false, onBack, onNavigate, savingsJars = [] }) => {
   const [timeframe, setTimeframe] = useState<'month' | 'year'>('month');
   const [showCustomizer, setShowCustomizer] = useState(false);
   const [enabledWidgets, setEnabledWidgets] = useState<string[]>(() => {
@@ -35,7 +38,6 @@ const Dashboard: React.FC<DashboardProps> = ({ expenses, incomes, categories, ac
   }, [enabledWidgets]);
 
   const toggleWidget = (id: string) => {
-    // Fix: prev is a string array, so the filter element w is a string itself and not an object with an id.
     setEnabledWidgets(prev => 
       prev.includes(id) ? prev.filter(w => w !== id) : [...prev, id]
     );
@@ -214,6 +216,39 @@ const Dashboard: React.FC<DashboardProps> = ({ expenses, incomes, categories, ac
           </div>
         )}
       </div>
+
+      {isWidgetEnabled('savings') && savingsJars.length > 0 && (
+        <section className="space-y-4 animate-in slide-in-from-bottom duration-500">
+           <div className="flex justify-between items-center px-2">
+              <h3 className="text-[10px] font-black opacity-60 uppercase tracking-[0.15em]">Obiettivi Risparmio</h3>
+              <button onClick={() => onNavigate && onNavigate('savings_jars')} className="text-[10px] font-black theme-primary uppercase tracking-widest">Tutti</button>
+           </div>
+           <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+              {savingsJars.slice(0, 3).map(jar => {
+                const progress = Math.min(100, (jar.currentAmount / jar.targetAmount) * 100);
+                return (
+                  <div key={jar.id} className="min-w-[200px] bg-white rounded-[2rem] p-5 border theme-border shadow-sm space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 theme-sub-bg rounded-xl flex items-center justify-center theme-primary">
+                        <CategoryIcon iconName={jar.icon} className="w-5 h-5" color="var(--primary)" />
+                      </div>
+                      <span className="font-bold text-sm text-[#4A453E] truncate">{jar.name}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[10px] font-black">
+                        <span className="opacity-40 uppercase">Avanzamento</span>
+                        <span className="theme-primary">{progress.toFixed(0)}%</span>
+                      </div>
+                      <div className="w-full h-2 theme-sub-bg rounded-full overflow-hidden">
+                        <div className="h-full theme-bg-primary rounded-full" style={{ width: `${progress}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+           </div>
+        </section>
+      )}
 
       {isWidgetEnabled('comparison') && (
         <section className="space-y-4 animate-in slide-in-from-bottom duration-500">

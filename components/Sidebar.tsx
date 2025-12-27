@@ -16,8 +16,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onViewChange, curren
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const t = {
-    it: { advisor: 'Consulente AI', reports: 'Report Mensili', export: 'Esporta Dati', settings: 'Impostazioni', logout: 'Esci', confirm: 'Sei sicuro?', logoutText: 'Effettuando il logout dovrai reinserire le credenziali.', yes: 'Sì, esci', no: 'No, rimani' },
-    en: { advisor: 'AI Advisor', reports: 'Monthly Reports', export: 'Export Data', settings: 'Settings', logout: 'Logout', confirm: 'Are you sure?', logoutText: 'By logging out you will need to re-enter your credentials.', yes: 'Yes, logout', no: 'No, stay' }
+    it: { advisor: 'Consulente AI', savings: 'Salvadanai', reports: 'Report Mensili', export: 'Esporta Dati', settings: 'Impostazioni', logout: 'Esci', confirm: 'Sei sicuro?', logoutText: 'Effettuando il logout dovrai reinserire le credenziali.', yes: 'Sì, esci', no: 'No, rimani' },
+    en: { advisor: 'AI Advisor', savings: 'Savings Jars', reports: 'Monthly Reports', export: 'Export Data', settings: 'Settings', logout: 'Logout', confirm: 'Are you sure?', logoutText: 'By logging out you will need to re-enter your credentials.', yes: 'Yes, logout', no: 'No, stay' }
   }[language];
 
   const confirmLogout = () => {
@@ -69,6 +69,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onViewChange, curren
 
           <nav className="space-y-1.5 flex-1">
             <MenuLink label={t.advisor} active={currentView === 'ai_advisor'} onClick={() => { onViewChange('ai_advisor'); onClose(); }} icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>} />
+            <MenuLink label={t.savings} active={currentView === 'savings_jars'} onClick={() => { onViewChange('savings_jars'); onClose(); }} icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>} />
             <MenuLink label={t.reports} active={currentView === 'monthly_reports'} onClick={() => { onViewChange('monthly_reports'); onClose(); }} icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>} />
             <MenuLink label={t.export} active={currentView === 'export'} onClick={() => { onViewChange('export'); onClose(); }} icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>} />
             <div className="pt-4 mt-4 border-t theme-border">

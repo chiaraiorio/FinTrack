@@ -62,7 +62,7 @@ const Settings: React.FC<SettingsProps> = ({
       <section className="space-y-4">
         <h3 className="text-[11px] font-black opacity-60 uppercase ml-4 tracking-widest">{t.theme}</h3>
         <div className="theme-card rounded-[2rem] p-6 shadow-sm">
-          <div className="grid grid-cols-4 gap-4 justify-items-center">
+          <div className="grid grid-cols-4 sm:grid-cols-4 gap-4 justify-items-center">
             {palettes.map((p) => {
               const isActive = currentPalette.name === p.name;
               return (
@@ -77,6 +77,9 @@ const Settings: React.FC<SettingsProps> = ({
                 </button>
               );
             })}
+          </div>
+          <div className="mt-4 text-center">
+             <p className="text-[10px] font-black theme-primary uppercase tracking-widest">{currentPalette.name}</p>
           </div>
         </div>
       </section>

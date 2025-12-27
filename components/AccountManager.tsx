@@ -29,7 +29,6 @@ const AccountManager: React.FC<AccountManagerProps> = ({
   const [showCardForm, setShowCardForm] = useState<string | null>(null);
   const [activeTransfer, setActiveTransfer] = useState<{from: any, jar?: SavingsJar, card?: LinkedCard} | null>(null);
   
-  // Form States (stringhe per input puliti)
   const [accName, setAccName] = useState('');
   const [accBalance, setAccBalance] = useState('');
   const [accType, setAccType] = useState<'Banca' | 'Contanti' | 'Carta' | 'Altro'>('Banca');
@@ -119,13 +118,13 @@ const AccountManager: React.FC<AccountManagerProps> = ({
                   </div>
                   <div>
                     <h4 className="font-black text-[#4A453E] text-lg leading-tight">{a.name}</h4>
-                    <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest">Totale Asset</p>
+                    <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest">Patrimonio</p>
                   </div>
                 </div>
                 <div className="text-right flex items-center gap-3">
                   <div>
                     <p className="text-xl font-black text-[#4A453E] tracking-tight">{hideBalances ? '€ ••••' : `€${totalAssets.toLocaleString('it-IT')}`}</p>
-                    <p className="text-[10px] font-bold theme-primary uppercase">{isExpanded ? 'Chiudi' : 'Dettagli'}</p>
+                    <p className="text-[10px] font-bold theme-primary uppercase">{isExpanded ? 'Chiudi' : 'Espandi'}</p>
                   </div>
                   <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
                     <svg className="w-4 h-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
@@ -135,39 +134,36 @@ const AccountManager: React.FC<AccountManagerProps> = ({
 
               {isExpanded && (
                 <div className="px-6 pb-8 space-y-8 animate-in slide-in-from-top-4 border-t theme-border pt-6">
-                  {/* Liquidità */}
                   <div className="bg-gray-50 p-5 rounded-3xl flex items-center justify-between border theme-border">
                     <div className="flex items-center gap-4">
                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center theme-primary shadow-sm">
                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                        </div>
                        <div>
-                         <p className="text-xs font-black text-[#4A453E]">Liquidità Conto</p>
-                         <p className="text-[10px] opacity-40 uppercase font-bold">Disponibilità immediata</p>
+                         <p className="text-xs font-black text-[#4A453E]">Disponibilità</p>
                        </div>
                     </div>
                     <p className="text-lg font-black text-[#4A453E]">€{a.balance.toLocaleString('it-IT')}</p>
                   </div>
 
-                  {/* Carte */}
                   <div className="space-y-4">
                     <div className="flex justify-between items-center px-1">
-                      <h5 className="text-[10px] font-black opacity-50 uppercase tracking-widest">Le mie Carte</h5>
-                      <button onClick={() => setShowCardForm(a.id)} className="theme-primary text-[10px] font-black uppercase">+ Aggiungi Carta</button>
+                      <h5 className="text-[10px] font-black opacity-50 uppercase tracking-widest">Carte Collegate</h5>
+                      <button onClick={() => setShowCardForm(a.id)} className="text-[10px] font-black uppercase theme-primary">+ Aggiungi</button>
                     </div>
                     <div className="grid grid-cols-1 gap-3">
                       {a.cards.map(card => (
                         <div key={card.id} className="theme-sub-bg p-4 rounded-2xl flex items-center justify-between border theme-border group">
-                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-6 bg-white border theme-border rounded flex items-center justify-center opacity-80">
+                          <div className="flex items-center gap-4 flex-1 min-w-0">
+                            <div className="w-10 h-6 bg-white border theme-border rounded flex items-center justify-center flex-shrink-0">
                                <div className="w-4 h-3 bg-gray-200 rounded-sm"></div>
                             </div>
-                            <div>
-                              <p className="text-xs font-black text-[#4A453E]">{card.name}</p>
+                            <div className="truncate">
+                              <p className="text-xs font-black text-[#4A453E] truncate">{card.name}</p>
                               <p className="text-[9px] font-bold opacity-40 uppercase">{card.type}</p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-4 flex-shrink-0">
                             <p className="text-sm font-black text-[#4A453E]">€{card.balance.toLocaleString('it-IT')}</p>
                             <button onClick={() => setActiveTransfer({from: a.id, card: card})} className="p-2 theme-primary bg-white rounded-lg shadow-sm active:scale-90 transition-transform">
                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
@@ -178,32 +174,36 @@ const AccountManager: React.FC<AccountManagerProps> = ({
                     </div>
                   </div>
 
-                  {/* Salvadanai */}
                   <div className="space-y-4">
                     <div className="flex justify-between items-center px-1">
-                      <h5 className="text-[10px] font-black opacity-50 uppercase tracking-widest">Salvadanai Interni</h5>
-                      <button onClick={() => setShowJarForm(a.id)} className="theme-primary text-[10px] font-black uppercase">+ Nuovo Salvadanaio</button>
+                      <h5 className="text-[10px] font-black opacity-50 uppercase tracking-widest">Salvadanai</h5>
+                      <button onClick={() => setShowJarForm(a.id)} className="text-[10px] font-black uppercase theme-primary">+ Crea</button>
                     </div>
                     <div className="grid grid-cols-1 gap-3">
                       {accountJars.map(jar => {
                         const progress = (jar.currentAmount / jar.targetAmount) * 100;
                         return (
-                          <div key={jar.id} className="theme-sub-bg p-5 rounded-3xl border theme-border space-y-4">
-                            <div className="flex justify-between items-center">
-                              <div className="flex items-center gap-3">
-                                <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center theme-primary shadow-sm">
-                                  <CategoryIcon iconName={jar.icon} className="w-5 h-5" color="var(--primary)" />
+                          <div key={jar.id} className="theme-sub-bg p-4 rounded-[2rem] border theme-border space-y-4">
+                            <div className="flex justify-between items-center gap-2">
+                              <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                                <div className="w-7 h-7 bg-white rounded-lg flex-shrink-0 flex items-center justify-center theme-primary shadow-sm">
+                                  <CategoryIcon iconName={jar.icon} className="w-4 h-4" />
                                 </div>
-                                <span className="text-sm font-black text-[#4A453E]">{jar.name}</span>
+                                <span className="text-xs font-black text-[#4A453E] truncate">{jar.name}</span>
                               </div>
-                              <button onClick={() => setActiveTransfer({from: a.id, jar: jar})} className="px-4 py-2 bg-white rounded-xl text-[10px] font-black theme-primary uppercase tracking-widest shadow-sm active:scale-95">Gestisci Risparmi</button>
+                              <button 
+                                onClick={() => setActiveTransfer({from: a.id, jar: jar})} 
+                                className="px-2 py-1 bg-white rounded-lg text-[7px] font-black theme-primary uppercase tracking-tighter shadow-sm active:scale-95 border theme-border flex-shrink-0"
+                              >
+                                Sposta
+                              </button>
                             </div>
-                            <div className="space-y-2">
+                            <div className="space-y-1.5 px-1">
                               <div className="flex justify-between items-baseline">
-                                <p className="text-lg font-black text-[#4A453E]">€{jar.currentAmount.toLocaleString()} <span className="text-[10px] opacity-30 font-bold">/ €{jar.targetAmount.toLocaleString()}</span></p>
-                                <span className="text-xs font-black theme-primary">{progress.toFixed(0)}%</span>
+                                <p className="text-sm font-black text-[#4A453E]">€{jar.currentAmount.toLocaleString()} <span className="text-[9px] opacity-30 font-bold">/ {jar.targetAmount.toLocaleString()}</span></p>
+                                <span className="text-[9px] font-black theme-primary">{progress.toFixed(0)}%</span>
                               </div>
-                              <div className="w-full h-2 bg-white rounded-full overflow-hidden">
+                              <div className="w-full h-1.5 bg-white rounded-full overflow-hidden">
                                 <div className="h-full theme-bg-primary transition-all duration-700" style={{ width: `${progress}%` }} />
                               </div>
                             </div>
@@ -219,22 +219,21 @@ const AccountManager: React.FC<AccountManagerProps> = ({
         })}
       </section>
 
-      {/* MODALI FORM */}
       {showAccForm && (
         <div className="fixed inset-0 bg-[#4A453E]/40 backdrop-blur-sm z-[110] flex items-center justify-center p-6">
           <form onSubmit={handleAccSubmit} className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl space-y-6">
             <h3 className="text-xl font-black text-center text-[#4A453E]">Nuovo Conto</h3>
             <div className="space-y-4">
               <input type="text" placeholder="Nome Banca" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={accName} onChange={e => setAccName(e.target.value)} required />
-              <input type="number" placeholder="Saldo Liquido Iniziale" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={accBalance} onChange={e => setAccBalance(e.target.value)} required />
+              <input type="number" placeholder="Saldo Iniziale" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={accBalance} onChange={e => setAccBalance(e.target.value)} required />
               <select className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={accType} onChange={e => setAccType(e.target.value as any)}>
                 <option value="Banca">Banca</option>
                 <option value="Contanti">Contanti</option>
-                <option value="Carta">Carta (Wallet/Prepagata)</option>
+                <option value="Carta">Prepagata</option>
               </select>
             </div>
             <div className="flex gap-2">
-              <button type="submit" className="flex-1 py-4 theme-bg-primary text-white rounded-2xl font-black text-sm">Crea Conto</button>
+              <button type="submit" className="flex-1 py-4 theme-bg-primary text-white rounded-2xl font-black text-sm">Crea</button>
               <button type="button" onClick={() => setShowAccForm(false)} className="px-6 py-4 theme-sub-bg text-[#918B82] rounded-2xl font-black text-sm">Chiudi</button>
             </div>
           </form>
@@ -246,17 +245,17 @@ const AccountManager: React.FC<AccountManagerProps> = ({
           <form onSubmit={handleCardSubmit} className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl space-y-6">
             <h3 className="text-xl font-black text-center text-[#4A453E]">Aggiungi Carta</h3>
             <div className="space-y-4">
-              <input type="text" placeholder="Nome Carta (es: Visa, Prepagata...)" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={cardName} onChange={e => setCardName(e.target.value)} required />
-              <input type="number" placeholder="Saldo Attuale Carta" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={cardBalance} onChange={e => setCardBalance(e.target.value)} required />
+              <input type="text" placeholder="Nome Carta" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={cardName} onChange={e => setCardName(e.target.value)} required />
+              <input type="number" placeholder="Saldo Attuale" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={cardBalance} onChange={e => setCardBalance(e.target.value)} required />
               <select className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={cardType} onChange={e => setCardType(e.target.value as any)}>
-                <option value="Prepagata">Carta Prepagata</option>
-                <option value="Credito">Carta di Credito</option>
-                <option value="Debito">Carta di Debito</option>
+                <option value="Debito">Debito</option>
+                <option value="Prepagata">Prepagata</option>
+                <option value="Credito">Credito</option>
               </select>
             </div>
             <div className="flex gap-2">
               <button type="submit" className="flex-1 py-4 theme-bg-primary text-white rounded-2xl font-black text-sm">Aggiungi</button>
-              <button type="button" onClick={() => setShowCardForm(null)} className="px-6 py-4 theme-sub-bg text-[#918B82] rounded-2xl font-black text-sm">Esci</button>
+              <button type="button" onClick={() => setShowCardForm(null)} className="px-6 py-4 theme-sub-bg text-[#918B82] rounded-2xl font-black text-sm">Indietro</button>
             </div>
           </form>
         </div>
@@ -265,26 +264,25 @@ const AccountManager: React.FC<AccountManagerProps> = ({
       {showJarForm && (
         <div className="fixed inset-0 bg-[#4A453E]/40 backdrop-blur-sm z-[110] flex items-center justify-center p-6">
           <form onSubmit={handleJarSubmit} className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl space-y-6">
-            <h3 className="text-xl font-black text-center text-[#4A453E]">Nuovo Obiettivo</h3>
+            <h3 className="text-xl font-black text-center text-[#4A453E]">Nuovo Risparmio</h3>
             <div className="space-y-4">
-              <input type="text" placeholder="Nome Obiettivo" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={jarName} onChange={e => setJarName(e.target.value)} required />
-              <input type="number" placeholder="Target (€)" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={jarTarget} onChange={e => setJarTarget(e.target.value)} required />
+              <input type="text" placeholder="Cosa stai risparmiando?" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={jarName} onChange={e => setJarName(e.target.value)} required />
+              <input type="number" placeholder="Obiettivo (€)" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={jarTarget} onChange={e => setJarTarget(e.target.value)} required />
             </div>
             <div className="flex gap-2">
               <button type="submit" className="flex-1 py-4 theme-bg-primary text-white rounded-2xl font-black text-sm">Crea</button>
-              <button type="button" onClick={() => setShowJarForm(null)} className="px-6 py-4 theme-sub-bg text-[#918B82] rounded-2xl font-black text-sm">Chiudi</button>
+              <button type="button" onClick={() => setShowJarForm(null)} className="px-6 py-4 theme-sub-bg text-[#918B82] rounded-2xl font-black text-sm">Indietro</button>
             </div>
           </form>
         </div>
       )}
 
-      {/* MODALE TRASFERIMENTO FONDI */}
       {activeTransfer && (
         <div className="fixed inset-0 bg-[#4A453E]/40 backdrop-blur-sm z-[120] flex items-center justify-center p-6 animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-xs rounded-[2.5rem] p-8 shadow-2xl space-y-6">
             <div className="text-center">
-              <h3 className="text-xl font-black text-[#4A453E]">Sposta Fondi</h3>
-              <p className="text-xs text-[#918B82] font-medium mt-1">Tra Liquidità e {activeTransfer.jar?.name || activeTransfer.card?.name}</p>
+              <h3 className="text-xl font-black text-[#4A453E]">Trasferisci</h3>
+              <p className="text-[10px] text-[#918B82] font-black uppercase mt-1 tracking-widest">{activeTransfer.jar?.name || activeTransfer.card?.name}</p>
             </div>
             <div className="space-y-4">
               <div className="relative">
@@ -293,8 +291,8 @@ const AccountManager: React.FC<AccountManagerProps> = ({
               </div>
             </div>
             <div className="flex flex-col gap-2">
-              <button onClick={() => executeTransfer(true)} className="w-full py-4 theme-bg-primary text-white rounded-2xl font-black text-sm active:scale-95 shadow-lg">Versa / Carica</button>
-              <button onClick={() => executeTransfer(false)} className="w-full py-4 bg-rose-50 text-rose-500 rounded-2xl font-black text-sm active:scale-95 border border-rose-100">Prelieva / Storna</button>
+              <button onClick={() => executeTransfer(true)} className="w-full py-4 theme-bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-transform">Versa</button>
+              <button onClick={() => executeTransfer(false)} className="w-full py-4 bg-rose-50 text-rose-500 rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-transform border border-rose-100">Preleva</button>
               <button onClick={() => setActiveTransfer(null)} className="w-full py-3 text-[#918B82] font-bold text-xs uppercase tracking-widest mt-2">Chiudi</button>
             </div>
           </div>

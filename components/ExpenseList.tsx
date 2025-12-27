@@ -25,20 +25,22 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
   expenses, categories, accounts, onOpenSidebar, 
   selectedMonth, selectedYear, onPrevMonth, onNextMonth,
   hideBalances, onToggleHideBalances, onDeleteExpense, onEditExpense,
-  language
+  language, onNavigate
 }) => {
-  const groupedExpenses = useMemo(() => {
+  const { groupedExpenses, monthTotal } = useMemo(() => {
     const filtered = expenses.filter(e => {
       const d = new Date(e.date);
       return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     const groups: Record<string, Expense[]> = {};
+    let total = 0;
     filtered.forEach(e => {
       if (!groups[e.date]) groups[e.date] = [];
       groups[e.date].push(e);
+      total += e.amount;
     });
-    return groups;
+    return { groupedExpenses: groups, monthTotal: total };
   }, [expenses, selectedMonth, selectedYear]);
 
   const monthName = new Date(selectedYear, selectedMonth).toLocaleString('it-IT', { month: 'long' });
@@ -52,24 +54,38 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
 
   return (
     <div className="px-5 pt-12">
-      <header className="mb-6 flex justify-between items-end">
-        <div>
-          <button onClick={onOpenSidebar} className="w-10 h-10 theme-card rounded-full flex items-center justify-center mb-4"><svg className="w-6 h-6 theme-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16m-7 6h7" /></svg></button>
-          <p className="text-[10px] font-black opacity-40 uppercase tracking-widest ml-1">{selectedYear}</p>
-          <h1 className="text-4xl font-black text-[#4A453E] capitalize">{monthName}</h1>
+      <header className="mb-6 flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <button onClick={onOpenSidebar} className="w-10 h-10 theme-card rounded-xl flex items-center justify-center active:scale-90 transition-transform">
+            <svg className="w-6 h-6 theme-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16m-7 6h7" /></svg>
+          </button>
+          <button onClick={() => onNavigate('search')} className="w-10 h-10 theme-card rounded-xl flex items-center justify-center active:scale-90 transition-transform">
+            <svg className="w-6 h-6 theme-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+          </button>
         </div>
-        <div className="flex bg-white rounded-full p-1 border theme-border shadow-sm">
-          <button onClick={onPrevMonth} className="p-2 theme-primary"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" /></svg></button>
-          <button onClick={onNextMonth} className="p-2 theme-primary"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" /></svg></button>
+        <div className="text-right">
+          <h1 className="text-xl font-black text-[#4A453E] tracking-tighter">Uscite</h1>
         </div>
       </header>
 
+      <div className="flex items-center justify-between bg-white rounded-3xl p-4 border theme-border shadow-sm mb-6">
+        <button onClick={onPrevMonth} className="p-2 theme-primary active:scale-90 transition-transform">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7" /></svg>
+        </button>
+        <div className="text-center">
+          <h2 className="text-2xl font-black text-[#4A453E] capitalize">{monthName}</h2>
+          <p className="text-[10px] font-black opacity-30 uppercase tracking-widest">{selectedYear}</p>
+        </div>
+        <button onClick={onNextMonth} className="p-2 theme-primary active:scale-90 transition-transform">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7" /></svg>
+        </button>
+      </div>
+
       <div className="bg-rose-50 rounded-[2.5rem] p-6 mb-8 flex justify-between items-center border border-rose-100">
         <div>
-          <p className="text-[10px] font-black text-rose-800 opacity-60 uppercase mb-1">Totale Uscite del Mese</p>
+          <p className="text-[10px] font-black text-rose-800 opacity-60 uppercase mb-1">Totale Uscite</p>
           <p className="text-3xl font-black text-rose-700">
-            {/* Fix: Using double reduce to calculate total without .flat() to avoid unknown type issues */}
-            {hideBalances ? '€ ••••' : `€${Object.values(groupedExpenses).reduce((acc, currentList) => acc + currentList.reduce((s, e) => s + e.amount, 0), 0).toLocaleString('it-IT')}`}
+            {hideBalances ? '€ ••••' : `€${monthTotal.toLocaleString('it-IT')}`}
           </p>
         </div>
         <button onClick={onToggleHideBalances} className="text-rose-300">
@@ -86,20 +102,17 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
                 const cat = categories.find(c => c.id === expense.categoryId);
                 const acc = accounts.find(a => a.id === expense.accountId);
                 return (
-                  <div key={expense.id} className={`p-4 rounded-3xl flex items-center gap-4 border theme-border shadow-sm group ${expense.isInternalTransfer ? 'bg-gray-50 opacity-80' : 'bg-white'}`}>
+                  <div key={expense.id} className={`p-4 rounded-3xl flex items-center gap-4 border theme-border shadow-sm group bg-white`}>
                     <div className="w-11 h-11 rounded-2xl flex items-center justify-center bg-rose-50 text-rose-500">
-                      <CategoryIcon iconName={expense.isInternalTransfer ? 'bolt' : (cat?.icon || 'generic')} className="w-5 h-5" />
+                      <CategoryIcon iconName={cat?.icon || 'generic'} className="w-5 h-5" />
                     </div>
                     <div className="flex-1 min-w-0" onClick={() => onEditExpense(expense)}>
                       <h4 className="font-black text-sm text-[#4A453E] truncate">{expense.notes || (cat?.name || 'Senza Categoria')}</h4>
-                      <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest">{acc?.name}</p>
+                      <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest">{acc?.name} • {cat?.name}</p>
                     </div>
-                    <div className="text-right flex flex-col items-end">
+                    <div className="text-right">
                       <p className="font-black text-rose-500 text-sm">-{hideBalances ? '€ ••' : `€${expense.amount.toLocaleString('it-IT')}`}</p>
-                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                         <button onClick={() => onEditExpense(expense)} className="text-[9px] font-black theme-primary uppercase">Modifica</button>
-                         <button onClick={() => onDeleteExpense(expense.id)} className="text-[9px] font-black text-rose-400 uppercase">Elimina</button>
-                      </div>
+                      <button onClick={() => onDeleteExpense(expense.id)} className="text-[8px] font-black text-rose-300 uppercase opacity-0 group-hover:opacity-100">Elimina</button>
                     </div>
                   </div>
                 );
@@ -108,7 +121,7 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
           </div>
         ))}
         {Object.keys(groupedExpenses).length === 0 && (
-          <div className="text-center py-10 opacity-30 italic">Nessun movimento trovato per questo periodo.</div>
+          <div className="text-center py-10 opacity-30 italic">Nessuna uscita trovata.</div>
         )}
       </div>
     </div>

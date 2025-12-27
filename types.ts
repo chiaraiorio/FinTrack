@@ -35,6 +35,7 @@ export interface Category {
   name: string;
   icon: string;
   color: string;
+  budget?: number; // Budget mensile opzionale per questa categoria
 }
 
 export interface IncomeCategory {
@@ -42,6 +43,7 @@ export interface IncomeCategory {
   name: string;
   icon: string;
   color: string;
+  budget?: number;
 }
 
 export interface LinkedCard {
@@ -95,4 +97,4 @@ export interface Income {
   fromAccountId?: string;
 }
 
-export type ViewType = 'list' | 'dashboard' | 'categories' | 'accounts' | 'settings' | 'export' | 'monthly_reports' | 'auth' | 'profile' | 'security' | 'bank_sync' | 'ai_advisor' | 'search' | 'income_list';
+export type ViewType = 'list' | 'dashboard' | 'categories' | 'income_categories' | 'accounts' | 'settings' | 'export' | 'monthly_reports' | 'auth' | 'profile' | 'security' | 'bank_sync' | 'ai_advisor' | 'search' | 'income_list' | 'budget_summary';

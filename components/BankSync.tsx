@@ -26,7 +26,6 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
     if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
       // @ts-ignore
       await window.aistudio.openSelectKey();
-      return true; // Procediamo assumendo che la selezione avvenga
     }
     return true;
   };
@@ -38,31 +37,41 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
     await checkApiKey();
     setUploadedFileName(file.name);
     setErrorMessage(null);
+    setIsParsing(true);
     
-    const reader = new FileReader();
-    if (file.type === 'application/pdf') {
-      reader.onload = async (event) => {
-        const base64Data = (event.target?.result as string).split(',')[1];
-        processRequest({ file: { data: base64Data, mimeType: file.type } });
-      };
-      reader.readAsDataURL(file);
-    } else {
-      reader.onload = (event) => {
-        const content = event.target?.result as string;
-        setInputText(content);
-        processRequest({ text: content });
-      };
-      reader.readAsText(file);
+    try {
+      const reader = new FileReader();
+      if (file.type === 'application/pdf') {
+        reader.onload = async (event) => {
+          const result = event.target?.result as string;
+          const base64Data = result.split(',')[1];
+          processRequest({ file: { data: base64Data, mimeType: file.type } });
+        };
+        reader.onerror = () => {
+          setErrorMessage("Errore durante la lettura del file PDF.");
+          setIsParsing(false);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        reader.onload = (event) => {
+          const content = event.target?.result as string;
+          setInputText(content);
+          processRequest({ text: content });
+        };
+        reader.readAsText(file);
+      }
+    } catch (err) {
+      setErrorMessage("Impossibile processare il file. Riprova con un altro formato.");
+      setIsParsing(false);
     }
   };
 
   const processRequest = async (input: BankParseInput) => {
-    setIsParsing(true);
     setErrorMessage(null);
     try {
       const results = await parseBankStatement(input, categories, incomeCategories);
       if (!results || results.length === 0) {
-        setErrorMessage("L'AI non ha rilevato movimenti. Verifica che il file non sia una scansione illeggibile o protetta.");
+        setErrorMessage("L'AI non ha trovato movimenti. Verifica che il PDF sia testuale e non una semplice immagine scansionata male.");
         setUploadedFileName(null);
       } else {
         const validResults = results.map(r => ({ 
@@ -77,8 +86,10 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
       if (error.message?.includes("Requested entity was not found")) {
         // @ts-ignore
         if (window.aistudio) await window.aistudio.openSelectKey();
+        setErrorMessage("Chiave API non valida o scaduta. Seleziona una chiave valida.");
+      } else {
+        setErrorMessage("Errore tecnico durante l'analisi AI. Prova a copiare e incollare il testo dei movimenti.");
       }
-      setErrorMessage("Errore tecnico durante l'analisi. Riprova o usa il copia-incolla del testo.");
       setUploadedFileName(null);
     } finally {
       setIsParsing(false);
@@ -87,6 +98,7 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
 
   const handleStartParsing = async () => {
     if (!inputText.trim()) return;
+    setIsParsing(true);
     await checkApiKey();
     processRequest({ text: inputText });
   };
@@ -118,22 +130,15 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
     setPreviewData(newData);
   };
 
-  const updateItemAccount = (index: number, accId: string) => {
-    if (!previewData) return;
-    const newData = [...previewData];
-    newData[index].accountId = accId;
-    setPreviewData(newData);
-  };
-
   return (
     <div className="px-5 pt-12 space-y-8 pb-32 animate-in fade-in duration-500">
       <header className="flex flex-col gap-4">
-        <button onClick={onOpenSidebar} className="w-10 h-10 theme-card rounded-full flex items-center justify-center active:scale-90 transition-transform">
+        <button onClick={onOpenSidebar} className="w-10 h-10 theme-card rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-sm">
           <svg className="w-6 h-6 theme-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16m-7 6h7" /></svg>
         </button>
         <div>
           <h1 className="text-4xl font-extrabold text-[#4A453E] tracking-tight">Importa PDF</h1>
-          <p className="text-sm text-[#918B82] font-medium leading-relaxed mt-2">Usa l'AI Gemini Pro per leggere automaticamente i tuoi estratti conto.</p>
+          <p className="text-sm text-[#918B82] font-medium leading-relaxed mt-2">Digitalizza estratti Fineco, BPER e altri in pochi secondi con Gemini Pro.</p>
         </div>
       </header>
 
@@ -146,12 +151,13 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
           )}
 
           <div className="theme-card rounded-[2.5rem] p-6 bg-white border theme-border shadow-sm space-y-4">
-             <label className="text-[10px] font-black theme-primary uppercase tracking-widest px-1">Seleziona Conto Destinazione</label>
+             <label className="text-[10px] font-black theme-primary uppercase tracking-widest px-1">Conto di destinazione</label>
              <div className="relative">
                <select 
                  className="w-full p-4 theme-sub-bg rounded-2xl font-bold theme-primary outline-none appearance-none pr-10"
                  value={defaultAccountId}
                  onChange={e => setDefaultAccountId(e.target.value)}
+                 disabled={isParsing}
                >
                  {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                </select>
@@ -176,18 +182,20 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
                 )}
               </div>
               <p className="text-xs font-black text-[#4A453E] text-center px-4">
-                {isParsing ? 'Analisi profonda PDF in corso...' : (uploadedFileName || 'Carica PDF Estratto Conto')}
+                {isParsing ? 'Analisi intelligente del PDF...' : (uploadedFileName || 'Tocca per caricare PDF')}
               </p>
-              <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".pdf,.csv,.txt" />
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Massima precisione per Fineco e BPER</p>
+              <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".pdf" />
             </div>
 
             <div className="relative pt-4">
               <label className="text-[10px] font-black opacity-30 uppercase tracking-widest px-1 mb-2 block">Oppure incolla i movimenti</label>
               <textarea 
                 className="w-full h-32 p-4 pt-4 theme-sub-bg rounded-2xl font-medium text-sm outline-none resize-none placeholder:text-[#D9D1C5] focus:ring-2 focus:ring-current theme-primary shadow-inner"
-                placeholder="Esempio: 12/03/24 Pagamento Amazon -€29,90..."
+                placeholder="Data | Descrizione | Importo..."
                 value={inputText}
                 onChange={e => setInputText(e.target.value)}
+                disabled={isParsing}
               />
             </div>
 
@@ -196,7 +204,7 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
               disabled={isParsing || (!inputText.trim() && !uploadedFileName)}
               className="w-full py-5 theme-bg-primary text-white rounded-3xl font-black text-[15px] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
             >
-              {isParsing ? 'Lavoro per te...' : 'Analizza con AI'}
+              {isParsing ? 'Scansione in corso...' : 'Analizza con AI'}
             </button>
           </div>
         </div>
@@ -204,11 +212,11 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
         <div className="space-y-6 animate-in slide-in-from-bottom duration-500">
           <div className="flex justify-between items-center px-2">
             <div>
-              <h3 className="font-black text-xl text-[#4A453E]">Risultati Analisi</h3>
-              <p className="text-[10px] font-bold text-emerald-500 uppercase">Seleziona cosa confermare</p>
+              <h3 className="font-black text-xl text-[#4A453E]">Revisione</h3>
+              <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Seleziona cosa importare</p>
             </div>
             <span className="bg-white border theme-border px-3 py-1.5 rounded-full text-[10px] font-black theme-primary shadow-sm">
-              {previewData.filter(d => !d.disabled).length} MOVIMENTI
+              {previewData.filter(d => !d.disabled).length} RIGHE
             </span>
           </div>
           
@@ -221,21 +229,20 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
               return (
                 <div 
                   key={idx} 
-                  className={`p-4 rounded-[2rem] flex flex-col gap-3 border transition-all ${t.disabled ? 'opacity-30 bg-gray-100 grayscale scale-[0.98]' : 'bg-white border-white shadow-sm'}`}
+                  className={`p-4 rounded-[2rem] flex items-center gap-4 border transition-all ${t.disabled ? 'opacity-30 bg-gray-100 grayscale scale-[0.98]' : 'bg-white border-white shadow-sm active:scale-[0.99]'}`}
+                  onClick={() => toggleItemSelection(idx)}
                 >
-                  <div className="flex items-center gap-4" onClick={() => toggleItemSelection(idx)}>
-                    <div className={`w-11 h-11 rounded-2xl flex items-center justify-center ${isExpense ? 'bg-red-50 text-red-500' : 'bg-emerald-50 text-emerald-600'}`}>
-                      <CategoryIcon iconName={cat?.icon || 'generic'} color={isExpense ? '#EF4444' : '#10B981'} className="w-5 h-5" />
-                    </div>
-                    <div className="flex-1 min-w-0 cursor-pointer">
-                      <p className="font-bold text-[13px] text-[#4A453E] truncate">{t.notes}</p>
-                      <p className="text-[9px] opacity-40 font-black uppercase tracking-tighter">{t.date} • {cat?.name || 'Da definire'}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className={`font-black text-sm ${isExpense ? 'text-red-500' : 'text-emerald-600'}`}>
-                        {isExpense ? '-' : '+'}€{Number(t.amount).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
-                      </p>
-                    </div>
+                  <div className={`w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 ${isExpense ? 'bg-red-50 text-red-500' : 'bg-emerald-50 text-emerald-600'}`}>
+                    <CategoryIcon iconName={cat?.icon || 'generic'} color={isExpense ? '#EF4444' : '#10B981'} className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-[13px] text-[#4A453E] truncate leading-tight">{t.notes}</p>
+                    <p className="text-[9px] opacity-40 font-black uppercase tracking-tight">{t.date} • {cat?.name || 'Da categorizzare'}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className={`font-black text-sm ${isExpense ? 'text-red-500' : 'text-emerald-600'}`}>
+                      {isExpense ? '-' : '+'}€{Number(t.amount).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                    </p>
                   </div>
                 </div>
               );
@@ -248,13 +255,13 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
               className="w-full py-5 theme-bg-primary text-white rounded-3xl font-black shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
-              Importa Movimenti
+              Importa in {accounts.find(a => a.id === defaultAccountId)?.name}
             </button>
             <button 
               onClick={() => { setPreviewData(null); setUploadedFileName(null); }} 
               className="w-full py-4 theme-sub-bg text-[#918B82] rounded-3xl font-bold active:scale-95 transition-all"
             >
-              Ripristina / Nuovo File
+              Annulla e riprova
             </button>
           </div>
         </div>

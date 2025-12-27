@@ -40,6 +40,11 @@
       overscroll-behavior-y: contain;
     }
 
+    /* Classi per il dimensionamento del testo */
+    .size-small { font-size: 0.875rem; }
+    .size-medium { font-size: 1rem; }
+    .size-large { font-size: 1.125rem; }
+
     .ios-blur {
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
@@ -63,7 +68,7 @@
     .animate-logo { animation: logo-float 4s ease-in-out infinite; }
 
     input, button, select, textarea {
-      font-size: 16px !important;
+      font-size: inherit;
     }
     
     /* Previene rimbalzi elastici su iOS */

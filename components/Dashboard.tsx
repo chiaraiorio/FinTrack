@@ -101,7 +101,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       const cat = categories.find(c => c.id === e.categoryId);
       const name = cat ? cat.name : 'Altro';
       if (!data[name]) {
-        data[name] = { amount: 0, icon: cat?.icon || 'generic', color: cat?.color || '#8E7C68' };
+        data[name] = { amount: 0, icon: cat?.icon || 'generic', color: cat?.color || '#F43F5E' };
       }
       data[name].amount += e.amount;
     });
@@ -147,7 +147,8 @@ const Dashboard: React.FC<DashboardProps> = ({
     setVisibleWidgets((prev: any) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const formatVal = (val: number) => new Intl.NumberFormat('it-IT').format(val);
+  // Fixed: handle any/unknown value types from library components by casting inside formatVal
+  const formatVal = (val: any) => new Intl.NumberFormat('it-IT').format(Number(val));
 
   return (
     <div className="px-5 pt-12 space-y-8 pb-32 animate-in fade-in duration-500">
@@ -163,7 +164,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             onClick={() => setShowConfig(!showConfig)} 
             className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${showConfig ? 'theme-bg-primary text-white' : 'theme-card text-primary'}`}
           >
-             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924-1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
           </button>
           <h1 className="text-xl font-black text-[#4A453E] tracking-tight">Home</h1>
         </div>
@@ -316,8 +317,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  {/* Fixed TypeScript unknown error by explicitly casting to number */}
-                  <Tooltip formatter={(value: any) => `€${formatVal(value as number)}`} />
+                  <Tooltip formatter={(value: any) => `€${formatVal(value)}`} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -341,10 +341,9 @@ const Dashboard: React.FC<DashboardProps> = ({
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dailyData}>
-                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#918B82', fontSize: 9, fontWeights: 900}} interval={2} />
-                {/* Fixed TypeScript unknown error by explicitly casting to number */}
-                <Tooltip cursor={{fill: '#F1EBE3'}} formatter={(value: any) => `€${formatVal(value as number)}`} />
-                <Bar dataKey="amount" fill="var(--primary)" radius={[2, 2, 0, 0]} />
+                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#918B82', fontSize: 9, fontWeight: 900}} interval={2} />
+                <Tooltip cursor={{fill: '#F1EBE3'}} formatter={(value: any) => `€${formatVal(value)}`} />
+                <Bar dataKey="amount" fill="#F43F5E" radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -359,8 +358,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData}>
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#918B82', fontSize: 10, fontWeight: 900}} />
-                {/* Fixed TypeScript unknown error by explicitly casting to number */}
-                <Tooltip cursor={{fill: '#F1EBE3'}} formatter={(value: any) => `€${formatVal(value as number)}`} />
+                <Tooltip cursor={{fill: '#F1EBE3'}} formatter={(value: any) => `€${formatVal(value)}`} />
                 <Bar dataKey="income" fill="#10B981" radius={[4, 4, 4, 4]} barSize={10} />
                 <Bar dataKey="total" fill="#F43F5E" radius={[4, 4, 4, 4]} barSize={10} />
               </BarChart>

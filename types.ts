@@ -9,15 +9,26 @@ export enum Repeatability {
   YEARLY = 'Annuale'
 }
 
-export type Language = 'it' | 'en';
+export type Language = 'it' | 'en' | 'es' | 'fr' | 'de';
 export type TextSize = 'small' | 'medium' | 'large';
+
+export interface ThemePalette {
+  name: string;
+  primary: string;
+  bg: string;
+}
 
 export interface AppSettings {
   monthlyBudget: number;
   firstDayOfMonth: number;
+  firstDayOfWeek: number; // 0: Domenica, 1: Lunedì
+  carryOverBalance: boolean;
+  currency: string;
+  language: Language;
   defaultAccountId: string;
   showDecimals: boolean;
   textSize: TextSize;
+  biometricEnabled: boolean;
 }
 
 export interface User {

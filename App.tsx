@@ -66,6 +66,9 @@ const App: React.FC = () => {
   const [isIncomeFormOpen, setIsIncomeFormOpen] = useState(false);
   const [isTransferFormOpen, setIsTransferFormOpen] = useState(false);
   
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [editingIncome, setEditingIncome] = useState<Income | null>(null);
+
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -153,6 +156,25 @@ const App: React.FC = () => {
     setIsFormOpen(false);
   };
 
+  const handleUpdateExpense = (updated: Expense) => {
+    const old = expenses.find(e => e.id === updated.id);
+    if (!old) return;
+
+    setExpenses(prev => prev.map(e => e.id === updated.id ? updated : e));
+    
+    setAccounts(prev => prev.map(a => {
+      let newBalance = a.balance;
+      // Ripristina vecchio importo
+      if (a.id === old.accountId) newBalance += old.amount;
+      // Sottrai nuovo importo
+      if (a.id === updated.accountId) newBalance -= updated.amount;
+      return { ...a, balance: newBalance, updatedAt: Date.now() };
+    }));
+
+    setEditingExpense(null);
+    setIsFormOpen(false);
+  };
+
   const handleSaveIncome = (newInc: Omit<Income, 'id' | 'updatedAt'>) => {
     const income: Income = { ...newInc, id: crypto.randomUUID(), updatedAt: Date.now() };
     setIncomes(prev => [income, ...prev]);
@@ -160,6 +182,25 @@ const App: React.FC = () => {
       if (a.id !== income.accountId) return a;
       return { ...a, balance: a.balance + income.amount, updatedAt: Date.now() };
     }));
+    setIsIncomeFormOpen(false);
+  };
+
+  const handleUpdateIncome = (updated: Income) => {
+    const old = incomes.find(i => i.id === updated.id);
+    if (!old) return;
+
+    setIncomes(prev => prev.map(i => i.id === updated.id ? updated : i));
+
+    setAccounts(prev => prev.map(a => {
+      let newBalance = a.balance;
+      // Ripristina vecchio importo (sottrai dal conto)
+      if (a.id === old.accountId) newBalance -= old.amount;
+      // Aggiungi nuovo importo
+      if (a.id === updated.accountId) newBalance += updated.amount;
+      return { ...a, balance: newBalance, updatedAt: Date.now() };
+    }));
+
+    setEditingIncome(null);
     setIsIncomeFormOpen(false);
   };
 
@@ -217,7 +258,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Fix: Added handleImportTransactions to process data from BankSync (parsed via Gemini)
   const handleImportTransactions = (transactions: any[]) => {
     const newExpenses: Expense[] = [];
     const newIncomes: Income[] = [];
@@ -271,8 +311,8 @@ const App: React.FC = () => {
     switch (view) {
       case 'dashboard': return <Dashboard expenses={expenses} incomes={incomes} categories={categories} accounts={accounts} incomeCategories={incomeCategories} onOpenSidebar={() => setIsSidebarOpen(true)} onNavigate={navigateTo} savingsJars={savingsJars} />;
       case 'accounts': return <AccountManager accounts={accounts} onAdd={a => setAccounts(prev => [...prev, { ...a, id: crypto.randomUUID(), updatedAt: Date.now() }])} onUpdate={a => setAccounts(prev => prev.map(acc => acc.id === a.id ? a : acc))} onDelete={id => setAccounts(prev => prev.filter(a => a.id !== id))} onReorder={setAccounts} hideBalances={hideBalances} onToggleHideBalances={() => setHideBalances(!hideBalances)} onOpenSidebar={() => setIsSidebarOpen(true)} jars={savingsJars} onAddJar={j => setSavingsJars(prev => [...prev, { ...j, id: crypto.randomUUID(), updatedAt: Date.now() }])} onUpdateJar={j => setSavingsJars(prev => prev.map(jar => jar.id === j.id ? j : jar))} onDeleteJar={id => setSavingsJars(prev => prev.filter(j => j.id !== id))} onMoveFunds={handleMoveFunds} />;
-      case 'list': return <ExpenseList expenses={expenses} categories={categories} accounts={accounts} onOpenSidebar={() => setIsSidebarOpen(true)} onNavigate={navigateTo} onDeleteExpense={id => setExpenses(prev => prev.filter(e => e.id !== id))} onEditExpense={() => {}} language={settings.language} showDecimals={settings.showDecimals} hideBalances={hideBalances} />;
-      case 'income_list': return <IncomeList incomes={incomes} incomeCategories={incomeCategories} accounts={accounts} onOpenSidebar={() => setIsSidebarOpen(true)} onNavigate={navigateTo} onDeleteIncome={id => setIncomes(prev => prev.filter(i => i.id !== id))} onEditIncome={() => {}} hideBalances={hideBalances} />;
+      case 'list': return <ExpenseList expenses={expenses} categories={categories} accounts={accounts} onOpenSidebar={() => setIsSidebarOpen(true)} onNavigate={navigateTo} onDeleteExpense={id => setExpenses(prev => prev.filter(e => e.id !== id))} onEditExpense={(exp) => { setEditingExpense(exp); setIsFormOpen(true); }} language={settings.language} showDecimals={settings.showDecimals} hideBalances={hideBalances} />;
+      case 'income_list': return <IncomeList incomes={incomes} incomeCategories={incomeCategories} accounts={accounts} onOpenSidebar={() => setIsSidebarOpen(true)} onNavigate={navigateTo} onDeleteIncome={id => setIncomes(prev => prev.filter(i => i.id !== id))} onEditIncome={(inc) => { setEditingIncome(inc); setIsIncomeFormOpen(true); }} hideBalances={hideBalances} />;
       case 'budget_summary': return <BudgetSummary expenses={expenses} categories={categories} incomeCategories={incomeCategories} onUpdateCategory={c => setCategories(prev => prev.map(cat => cat.id === c.id ? c : cat))} onUpdateIncomeCategory={c => setIncomeCategories(prev => prev.map(cat => cat.id === c.id ? c : cat))} onNavigate={navigateTo} onOpenSidebar={() => setIsSidebarOpen(true)} />;
       case 'ai_advisor': return <AiAdvisor expenses={expenses} categories={categories} accounts={accounts} onOpenSidebar={() => setIsSidebarOpen(true)} language={settings.language} />;
       case 'bank_sync': return <BankSync categories={categories} incomeCategories={incomeCategories} accounts={accounts} onImport={handleImportTransactions} onOpenSidebar={() => setIsSidebarOpen(true)} />;
@@ -293,8 +333,8 @@ const App: React.FC = () => {
           <div className="fixed inset-0 bg-black/5 z-[40]" onClick={() => setIsActionMenuOpen(false)} />
           <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex flex-col gap-3 z-[50] animate-in slide-in-from-bottom-4 duration-300 items-center">
             <button onClick={() => { setIsTransferFormOpen(true); setIsActionMenuOpen(false); }} className="flex items-center gap-2 bg-sky-500 text-white px-5 py-3.5 rounded-2xl shadow-xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>Trasferimento</button>
-            <button onClick={() => { setIsIncomeFormOpen(true); setIsActionMenuOpen(false); }} className="flex items-center gap-2 bg-emerald-500 text-white px-5 py-3.5 rounded-2xl shadow-xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>Nuova Entrata</button>
-            <button onClick={() => { setIsFormOpen(true); setIsActionMenuOpen(false); }} className="flex items-center gap-2 bg-red-500 text-white px-5 py-3.5 rounded-2xl shadow-xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M20 12H4" /></svg>Nuova Uscita</button>
+            <button onClick={() => { setEditingIncome(null); setIsIncomeFormOpen(true); setIsActionMenuOpen(false); }} className="flex items-center gap-2 bg-emerald-500 text-white px-5 py-3.5 rounded-2xl shadow-xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>Nuova Entrata</button>
+            <button onClick={() => { setEditingExpense(null); setIsFormOpen(true); setIsActionMenuOpen(false); }} className="flex items-center gap-2 bg-red-500 text-white px-5 py-3.5 rounded-2xl shadow-xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M20 12H4" /></svg>Nuova Uscita</button>
           </div>
         </>
       )}
@@ -306,8 +346,8 @@ const App: React.FC = () => {
     <Layout activeView={view} onViewChange={navigateTo} centerButton={Fab}>
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} onViewChange={navigateTo} currentView={view} user={currentUser} onLogout={handleLogout} language={settings.language} />
       <div className={`app-container size-${settings.textSize}`}>{renderView()}</div>
-      {isFormOpen && <ExpenseForm categories={categories} accounts={accounts} onSave={handleSaveExpense} onClose={() => setIsFormOpen(false)} defaultAccountId={settings.defaultAccountId} />}
-      {isIncomeFormOpen && <IncomeForm accounts={accounts} incomeCategories={incomeCategories} onSave={handleSaveIncome} onClose={() => setIsIncomeFormOpen(false)} />}
+      {isFormOpen && <ExpenseForm categories={categories} accounts={accounts} onSave={handleSaveExpense} onUpdate={handleUpdateExpense} onClose={() => { setIsFormOpen(false); setEditingExpense(null); }} initialData={editingExpense || undefined} defaultAccountId={settings.defaultAccountId} />}
+      {isIncomeFormOpen && <IncomeForm accounts={accounts} incomeCategories={incomeCategories} onSave={handleSaveIncome} onUpdate={handleUpdateIncome} onClose={() => { setIsIncomeFormOpen(false); setEditingIncome(null); }} initialData={editingIncome || undefined} />}
       {isTransferFormOpen && <TransferForm accounts={accounts} onSave={handleSaveTransfer} onClose={() => setIsTransferFormOpen(false)} />}
     </Layout>
   );

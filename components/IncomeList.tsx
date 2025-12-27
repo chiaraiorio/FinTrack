@@ -20,7 +20,7 @@ type PeriodMode = 'day' | 'month' | 'year';
 
 const IncomeList: React.FC<IncomeListProps> = ({ 
   incomes, incomeCategories, accounts, onOpenSidebar, 
-  onDeleteIncome, hideBalances
+  onDeleteIncome, onEditIncome, hideBalances
 }) => {
   const [periodMode, setPeriodMode] = useState<PeriodMode>('month');
   const [cursor, setCursor] = useState(new Date());
@@ -95,17 +95,20 @@ const IncomeList: React.FC<IncomeListProps> = ({
         {filteredData.map(i => {
           const cat = incomeCategories.find(c => c.id === i.categoryId);
           return (
-            <div key={i.id} className="p-4 rounded-3xl flex items-center gap-4 border theme-border shadow-sm bg-white active:scale-95 transition-all">
+            <div key={i.id} className="p-4 rounded-3xl flex items-center gap-4 border theme-border shadow-sm bg-white active:bg-gray-50 transition-all">
               <div className="w-11 h-11 rounded-2xl flex items-center justify-center bg-emerald-50 text-emerald-600">
                 <CategoryIcon iconName={cat?.icon || 'generic'} className="w-5 h-5" />
               </div>
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0" onClick={() => onEditIncome(i)}>
                 <h4 className="font-black text-sm text-[#4A453E] truncate">{i.notes || cat?.name || 'Entrata'}</h4>
                 <p className="text-[9px] font-bold opacity-40 uppercase tracking-widest">{accounts.find(a => a.id === i.accountId)?.name} • {i.date}</p>
               </div>
               <div className="text-right">
                 <p className="font-black text-emerald-600 text-sm">+{hideBalances ? '€ ••' : `€${i.amount.toLocaleString('it-IT')}`}</p>
-                <button onClick={() => onDeleteIncome(i.id)} className="text-[8px] font-bold uppercase text-rose-300">Elimina</button>
+                <div className="flex gap-2 justify-end mt-1">
+                  <button onClick={() => onEditIncome(i)} className="text-[8px] font-bold uppercase text-sky-400">Modifica</button>
+                  <button onClick={() => onDeleteIncome(i.id)} className="text-[8px] font-bold uppercase text-rose-300">Elimina</button>
+                </div>
               </div>
             </div>
           );

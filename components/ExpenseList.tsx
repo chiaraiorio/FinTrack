@@ -78,40 +78,56 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
 
       <div className="flex bg-white rounded-2xl p-1 mb-6 border theme-border shadow-sm">
         {(['day', 'month', 'year'] as PeriodMode[]).map(m => (
-          <button key={m} onClick={() => setPeriodMode(m)} className={`flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl ${periodMode === m ? 'theme-bg-primary text-white shadow-md' : 'text-[#918B82]'}`}>
+          <button 
+            key={m} 
+            onClick={() => setPeriodMode(m)} 
+            className={`flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${periodMode === m ? 'bg-red-500 text-white shadow-md' : 'text-[#918B82]'}`}
+          >
             {m === 'day' ? 'Giorno' : m === 'month' ? 'Mese' : 'Anno'}
           </button>
         ))}
       </div>
 
       <div className="flex items-center justify-between bg-white rounded-3xl p-5 border theme-border shadow-sm mb-8">
-        <button onClick={() => changeCursor(-1)} className="p-2 theme-primary"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7" /></svg></button>
+        <button onClick={() => changeCursor(-1)} className="p-2 text-red-500 active:scale-90 transition-transform">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7" /></svg>
+        </button>
         <div className="text-center">
           <h2 className="text-lg font-black text-[#4A453E] capitalize">{label()}</h2>
-          <p className="text-[10px] font-bold theme-primary uppercase">Totale: {hideBalances ? '€ ••' : `€${total.toLocaleString('it-IT')}`}</p>
+          <p className="text-[10px] font-bold text-red-500 uppercase">Totale: {hideBalances ? '€ ••' : `€${total.toLocaleString('it-IT')}`}</p>
         </div>
-        <button onClick={() => changeCursor(1)} className="p-2 theme-primary"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7" /></svg></button>
+        <button onClick={() => changeCursor(1)} className="p-2 text-red-500 active:scale-90 transition-transform">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7" /></svg>
+        </button>
       </div>
 
       <div className="space-y-3">
         {filteredData.map(e => {
           const cat = categories.find(c => c.id === e.categoryId);
           return (
-            <div key={e.id} className="p-4 rounded-3xl flex items-center gap-4 border theme-border shadow-sm bg-white active:scale-95 transition-all">
+            <div key={e.id} className="p-4 rounded-3xl flex items-center gap-4 border theme-border shadow-sm bg-white active:bg-gray-50 transition-all group">
               <div className="w-11 h-11 rounded-2xl flex items-center justify-center bg-red-50 text-red-500">
-                <CategoryIcon iconName={cat?.icon || 'generic'} className="w-5 h-5" />
+                <CategoryIcon iconName={cat?.icon || 'generic'} className="w-5 h-5" color="#EF4444" />
               </div>
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0" onClick={() => onEditExpense(e)}>
                 <h4 className="font-black text-sm text-[#4A453E] truncate">{e.notes || cat?.name || 'Spesa'}</h4>
                 <p className="text-[9px] font-bold opacity-40 uppercase tracking-widest">{accounts.find(a => a.id === e.accountId)?.name} • {e.date}</p>
               </div>
               <div className="text-right">
                 <p className="font-black text-red-600 text-sm">-{hideBalances ? '€ ••' : `€${e.amount.toLocaleString('it-IT')}`}</p>
-                <button onClick={() => onDeleteExpense(e.id)} className="text-[8px] font-bold uppercase text-red-300">Elimina</button>
+                <div className="flex gap-2 justify-end mt-1">
+                  <button onClick={() => onEditExpense(e)} className="text-[8px] font-bold uppercase text-sky-400">Modifica</button>
+                  <button onClick={() => onDeleteExpense(e.id)} className="text-[8px] font-bold uppercase text-red-300">Elimina</button>
+                </div>
               </div>
             </div>
           );
         })}
+        {filteredData.length === 0 && (
+          <div className="py-20 text-center opacity-30 italic font-medium">
+            Nessun movimento registrato in questo periodo.
+          </div>
+        )}
       </div>
     </div>
   );

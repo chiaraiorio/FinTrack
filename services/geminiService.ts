@@ -52,19 +52,23 @@ export const parseBankStatement = async (input: BankParseInput, categories: Cate
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const prompt = `
-    Sei un assistente esperto in contabilità bancaria italiana. Analizza l'estratto conto allegato (PDF o testo).
+    Sei un assistente contabile esperto. Analizza l'estratto conto bancario fornito.
     
-    ISTRUZIONI PER IL LAYOUT:
-    1. **FINECO**: Cerca le colonne "USCITE" e "ENTRATE". Se un valore è in "USCITE", è una SPESA. Se è in "ENTRATE", è un'ENTRATA.
-    2. **BPER / ALTRE**: Cerca la colonna "Importo Euro". Se il numero è preceduto da "-" o è indicato come addebito, è una SPESA. Se è positivo o accredito, è un'ENTRATA.
-    3. **DECIMALI**: Gli importi usano la virgola (es. 10,50). Convertili in formato numerico standard (es. 10.50). L'importo nel JSON deve essere sempre POSITIVO.
-    4. **DATE**: Formato richiesto YYYY-MM-DD.
-    5. **CATEGORIE**: Associa ogni riga all'ID più logico:
+    REGOLE DI FILTRO:
+    - IGNORA le pagine di informativa legale, glossari o pubblicità (es. pagine "Modulo Standard").
+    - TROVA le tabelle dei movimenti.
+    
+    REGOLE DI ESTRAZIONE:
+    1. FINECO: Se trovi colonne separate "USCITE" e "ENTRATE", assegna il tipo "SPESA" se il valore è in USCITE, "ENTRATA" se è in ENTRATE.
+    2. BPER: Se trovi la colonna "Importo Euro", usa il segno per distinguere (negativo = SPESA, positivo = ENTRATA).
+    3. NUMERI: Converti la virgola decimale italiana in punto (es. 1.250,50 -> 1250.50). L'importo nel JSON deve essere sempre un numero POSITIVO.
+    4. DATE: Formato standard YYYY-MM-DD.
+    5. CATEGORIE: Associa ogni riga a uno degli ID forniti sotto:
        - USCITE: ${JSON.stringify(categories.map(c => ({ id: c.id, name: c.name })))}
        - ENTRATE: ${JSON.stringify(incomeCategories.map(c => ({ id: c.id, name: c.name })))}
+       Se incerto, usa "Altro".
 
-    Estrai SOLO i singoli movimenti. Ignora i riepiloghi, i saldi iniziali/finali e le competenze.
-    Restituisci un array JSON piatto di oggetti.
+    RESTITUISCI SOLO UN ARRAY JSON PIATTO.
   `;
 
   const parts: any[] = [];
@@ -77,16 +81,20 @@ export const parseBankStatement = async (input: BankParseInput, categories: Cate
     });
   }
   
-  parts.push({ text: input.text ? `${prompt}\n\nTESTO AGGIUNTIVO: ${input.text}` : prompt });
+  if (input.text) {
+    parts.push({ text: `TESTO ESTRATTO: ${input.text}` });
+  }
+
+  parts.push({ text: prompt });
 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: [{ parts }],
       config: {
-        // Configurazione cruciale per Gemini 3: budget di pensiero + limite output
-        thinkingConfig: { thinkingBudget: 10000 },
-        maxOutputTokens: 20000, 
+        // Ridotto il budget di pensiero per evitare timeout del server
+        thinkingConfig: { thinkingBudget: 5000 },
+        // Rimosso maxOutputTokens per evitare blocchi sulla lunghezza della risposta
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -106,7 +114,7 @@ export const parseBankStatement = async (input: BankParseInput, categories: Cate
     });
 
     const text = response.text;
-    if (!text) throw new Error("Risposta vuota dal modello.");
+    if (!text) return [];
     return JSON.parse(text);
   } catch (error) {
     console.error("Gemini Parsing Error:", error);

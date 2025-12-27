@@ -316,8 +316,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  {/* Fixed TypeScript error: correctly cast unknown 'value' to number for formatVal */}
-                  <Tooltip formatter={(value: unknown) => `€${formatVal(Number(value))}`} />
+                  {/* Fixed TypeScript unknown error by explicitly casting to number */}
+                  <Tooltip formatter={(value: any) => `€${formatVal(value as number)}`} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -341,9 +341,9 @@ const Dashboard: React.FC<DashboardProps> = ({
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dailyData}>
-                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#918B82', fontSize: 9, fontWeight: 900}} interval={2} />
-                {/* Fixed TypeScript error: correctly cast unknown 'value' to number for formatVal */}
-                <Tooltip cursor={{fill: '#F1EBE3'}} formatter={(value: unknown) => `€${formatVal(Number(value))}`} />
+                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#918B82', fontSize: 9, fontWeights: 900}} interval={2} />
+                {/* Fixed TypeScript unknown error by explicitly casting to number */}
+                <Tooltip cursor={{fill: '#F1EBE3'}} formatter={(value: any) => `€${formatVal(value as number)}`} />
                 <Bar dataKey="amount" fill="var(--primary)" radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -359,8 +359,8 @@ const Dashboard: React.FC<DashboardProps> = ({
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData}>
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#918B82', fontSize: 10, fontWeight: 900}} />
-                {/* Fixed TypeScript error: correctly cast unknown 'value' to number for formatVal */}
-                <Tooltip cursor={{fill: '#F1EBE3'}} formatter={(value: unknown) => `€${formatVal(Number(value))}`} />
+                {/* Fixed TypeScript unknown error by explicitly casting to number */}
+                <Tooltip cursor={{fill: '#F1EBE3'}} formatter={(value: any) => `€${formatVal(value as number)}`} />
                 <Bar dataKey="income" fill="#10B981" radius={[4, 4, 4, 4]} barSize={10} />
                 <Bar dataKey="total" fill="#F43F5E" radius={[4, 4, 4, 4]} barSize={10} />
               </BarChart>

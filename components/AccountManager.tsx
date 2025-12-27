@@ -45,7 +45,7 @@ const AccountManager: React.FC<AccountManagerProps> = ({
   const handleAccSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!accName.trim()) return;
-    onAdd({ name: accName, balance: parseFloat(accBalance) || 0, type: accType, color: '#8E7C68', cards: [] });
+    onAdd({ name: accName, balance: parseFloat(accBalance) || 0, type: accType, color: '#8E7C68', cards: [], updatedAt: Date.now() });
     setAccName(''); setAccBalance(''); setShowAccForm(false);
   };
 
@@ -54,7 +54,8 @@ const AccountManager: React.FC<AccountManagerProps> = ({
     if (!cardName.trim() || !showCardForm) return;
     const acc = accounts.find(a => a.id === showCardForm);
     if (!acc) return;
-    const newCard: LinkedCard = { id: crypto.randomUUID(), name: cardName, balance: parseFloat(cardBalance) || 0, type: cardType };
+    // Added updatedAt property to satisfy LinkedCard type
+    const newCard: LinkedCard = { id: crypto.randomUUID(), name: cardName, balance: parseFloat(cardBalance) || 0, type: cardType, updatedAt: Date.now() };
     onUpdate({ ...acc, cards: [...acc.cards, newCard] });
     setCardName(''); setCardBalance(''); setShowCardForm(null);
   };
@@ -62,7 +63,7 @@ const AccountManager: React.FC<AccountManagerProps> = ({
   const handleJarSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!jarName.trim() || !jarTarget || !showJarForm) return;
-    onAddJar({ name: jarName, targetAmount: parseFloat(jarTarget) || 0, currentAmount: 0, accountId: showJarForm, color: '#8E7C68', icon: 'briefcase' });
+    onAddJar({ name: jarName, targetAmount: parseFloat(jarTarget) || 0, currentAmount: 0, accountId: showJarForm, color: '#8E7C68', icon: 'briefcase', updatedAt: Date.now() });
     setJarName(''); setJarTarget(''); setShowJarForm(null);
   };
 

@@ -28,6 +28,7 @@ export interface User {
   language?: Language;
   settings?: AppSettings;
   isVerified?: boolean;
+  updatedAt: number;
 }
 
 export interface Category {
@@ -35,7 +36,8 @@ export interface Category {
   name: string;
   icon: string;
   color: string;
-  budget?: number; // Budget mensile opzionale per questa categoria
+  budget?: number;
+  updatedAt: number;
 }
 
 export interface IncomeCategory {
@@ -44,6 +46,7 @@ export interface IncomeCategory {
   icon: string;
   color: string;
   budget?: number;
+  updatedAt: number;
 }
 
 export interface LinkedCard {
@@ -52,6 +55,7 @@ export interface LinkedCard {
   balance: number;
   type: 'Credito' | 'Prepagata' | 'Debito';
   lastFour?: string;
+  updatedAt: number;
 }
 
 export interface Account {
@@ -61,6 +65,7 @@ export interface Account {
   type: 'Banca' | 'Contanti' | 'Carta' | 'Altro';
   color: string;
   cards: LinkedCard[];
+  updatedAt: number;
 }
 
 export interface SavingsJar {
@@ -71,6 +76,7 @@ export interface SavingsJar {
   accountId: string;
   color: string;
   icon: string;
+  updatedAt: number;
 }
 
 export interface Expense {
@@ -84,6 +90,7 @@ export interface Expense {
   repeatability: Repeatability;
   usedLinkedCard?: boolean;
   isInternalTransfer?: boolean;
+  updatedAt: number;
 }
 
 export interface Income {
@@ -95,6 +102,7 @@ export interface Income {
   notes: string;
   isInternalTransfer?: boolean;
   fromAccountId?: string;
+  updatedAt: number;
 }
 
 export type ViewType = 'list' | 'dashboard' | 'categories' | 'income_categories' | 'accounts' | 'settings' | 'export' | 'monthly_reports' | 'auth' | 'profile' | 'security' | 'bank_sync' | 'ai_advisor' | 'search' | 'income_list' | 'budget_summary';

@@ -37,9 +37,6 @@ const PALETTES: ThemePalette[] = [
   { name: 'Sottobosco', primary: '#2D6A4F', bg: '#F1F7F4', border: '#D8E5DF', card: '#FFFFFF', subBg: '#F1F7F4' },
   { name: 'Rosa Rubino', primary: '#9D446E', bg: '#FDF2F7', border: '#F5E1EC', card: '#FFFFFF', subBg: '#FDF2F7' },
   { name: 'Mezzanotte', primary: '#4338CA', bg: '#EEF2FF', border: '#C7D2FE', card: '#FFFFFF', subBg: '#EEF2FF' },
-  { name: 'Ambra Calda', primary: '#D97706', bg: '#FFFBEB', border: '#FEF3C7', card: '#FFFFFF', subBg: '#FFFBEB' },
-  { name: 'Verde Menta', primary: '#059669', bg: '#F0FDF4', border: '#DCFCE7', card: '#FFFFFF', subBg: '#F0FDF4' },
-  { name: 'Lavanda Dolce', primary: '#8B5CF6', bg: '#F5F3FF', border: '#DDD6FE', card: '#FFFFFF', subBg: '#F5F3FF' },
 ];
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -52,8 +49,10 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('current_user');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('current_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) { return null; }
   });
 
   const [viewHistory, setViewHistory] = useState<ViewType[]>(['dashboard']);
@@ -66,9 +65,9 @@ const App: React.FC = () => {
 
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [incomes, setIncomes] = useState<Income[]>([]);
-  const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
-  const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>(INITIAL_INCOME_CATEGORIES);
-  const [accounts, setAccounts] = useState<Account[]>(INITIAL_ACCOUNTS);
+  const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES.map(c => ({...c, updatedAt: Date.now()})));
+  const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>(INITIAL_INCOME_CATEGORIES.map(c => ({...c, updatedAt: Date.now()})));
+  const [accounts, setAccounts] = useState<Account[]>(INITIAL_ACCOUNTS.map(a => ({...a, updatedAt: Date.now()})));
   const [savingsJars, setSavingsJars] = useState<SavingsJar[]>([]);
   const [hideBalances, setHideBalances] = useState(localStorage.getItem('hide_balances') === 'true');
 
@@ -83,9 +82,7 @@ const App: React.FC = () => {
 
   const view = viewHistory[viewHistory.length - 1];
 
-  const getUserKey = useCallback((base: string) => {
-    return currentUser ? `user_${currentUser.id}_${base}` : null;
-  }, [currentUser]);
+  const getUserKey = useCallback((base: string) => currentUser ? `user_${currentUser.id}_${base}` : null, [currentUser]);
 
   useEffect(() => {
     if (currentUser) {
@@ -96,24 +93,23 @@ const App: React.FC = () => {
       };
       setExpenses(load(getUserKey('expenses'), []));
       setIncomes(load(getUserKey('incomes'), []));
-      setCategories(load(getUserKey('categories'), INITIAL_CATEGORIES));
-      setIncomeCategories(load(getUserKey('income_categories'), INITIAL_INCOME_CATEGORIES));
-      setAccounts(load(getUserKey('accounts'), INITIAL_ACCOUNTS));
+      setCategories(load(getUserKey('categories'), categories));
+      setIncomeCategories(load(getUserKey('income_categories'), incomeCategories));
+      setAccounts(load(getUserKey('accounts'), accounts));
       setSavingsJars(load(getUserKey('savings_jars'), []));
     }
   }, [currentUser, getUserKey]);
 
   useEffect(() => {
     if (!currentUser) return;
-    const save = (key: string | null, data: any) => {
-      if (key) localStorage.setItem(key, JSON.stringify(data));
-    };
+    const save = (key: string | null, data: any) => { if (key) localStorage.setItem(key, JSON.stringify(data)); };
     save(getUserKey('expenses'), expenses);
     save(getUserKey('incomes'), incomes);
     save(getUserKey('categories'), categories);
     save(getUserKey('income_categories'), incomeCategories);
     save(getUserKey('accounts'), accounts);
     save(getUserKey('savings_jars'), savingsJars);
+    localStorage.setItem('current_user', JSON.stringify(currentUser));
   }, [expenses, incomes, categories, incomeCategories, accounts, savingsJars, currentUser, getUserKey]);
 
   useEffect(() => {
@@ -125,97 +121,121 @@ const App: React.FC = () => {
     root.style.setProperty('--secondary-bg', currentTheme.subBg);
     const settings = currentUser?.settings || DEFAULT_SETTINGS;
     root.style.fontSize = { small: '14px', medium: '16px', large: '18px' }[settings.textSize];
-    localStorage.setItem('app_theme', currentTheme.name);
   }, [currentTheme, currentUser?.settings]);
 
-  const navigateTo = (newView: ViewType) => {
-    if (newView === view) return;
-    setViewHistory(prev => [...prev, newView]);
+  const generateSyncCode = (): string => {
+    const bundle = {
+      user: currentUser,
+      expenses,
+      incomes,
+      categories,
+      incomeCategories,
+      accounts,
+      savingsJars,
+      theme: currentTheme.name,
+      lang: language,
+      timestamp: Date.now()
+    };
+    return btoa(unescape(encodeURIComponent(JSON.stringify(bundle))));
   };
+
+  const smartMerge = (local: any[], remote: any[]): any[] => {
+    const merged = [...local];
+    remote.forEach(remoteItem => {
+      const index = merged.findIndex(l => l.id === remoteItem.id);
+      if (index === -1) {
+        merged.push(remoteItem);
+      } else {
+        if ((remoteItem.updatedAt || 0) > (merged[index].updatedAt || 0)) {
+          merged[index] = remoteItem;
+        }
+      }
+    });
+    return merged;
+  };
+
+  const importFromSyncCode = (code: string, mode: 'merge' | 'replace'): boolean => {
+    try {
+      const decoded = JSON.parse(decodeURIComponent(escape(atob(code))));
+      if (!decoded.user || !decoded.expenses) return false;
+      
+      if (mode === 'replace') {
+        setCurrentUser(decoded.user);
+        setExpenses(decoded.expenses);
+        setIncomes(decoded.incomes);
+        setCategories(decoded.categories);
+        setIncomeCategories(decoded.incomeCategories);
+        setAccounts(decoded.accounts);
+        setSavingsJars(decoded.savingsJars);
+      } else {
+        setExpenses(prev => smartMerge(prev, decoded.expenses));
+        setIncomes(prev => smartMerge(prev, decoded.incomes));
+        setCategories(prev => smartMerge(prev, decoded.categories));
+        setIncomeCategories(prev => smartMerge(prev, decoded.incomeCategories));
+        setAccounts(prev => smartMerge(prev, decoded.accounts));
+        setSavingsJars(prev => smartMerge(prev, decoded.savingsJars));
+        if ((decoded.user.updatedAt || 0) > (currentUser?.updatedAt || 0)) {
+          setCurrentUser(decoded.user);
+        }
+      }
+
+      setLanguage(decoded.lang || 'it');
+      const theme = PALETTES.find(p => p.name === decoded.theme) || PALETTES[0];
+      setCurrentTheme(theme);
+      
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const navigateTo = (newView: ViewType) => setViewHistory(prev => [...prev, newView]);
 
   const handleUpdateUser = (updatedUser: User) => {
-    setCurrentUser(updatedUser);
-    const registeredUsers: User[] = JSON.parse(localStorage.getItem('registered_users') || '[]');
-    const updatedRegisteredUsers = registeredUsers.map(u => u.id === updatedUser.id ? updatedUser : u);
-    localStorage.setItem('registered_users', JSON.stringify(updatedRegisteredUsers));
+    const userWithTs = { ...updatedUser, updatedAt: Date.now() };
+    setCurrentUser(userWithTs);
+    const registered: User[] = JSON.parse(localStorage.getItem('registered_users') || '[]');
+    localStorage.setItem('registered_users', JSON.stringify(registered.map(u => u.id === updatedUser.id ? userWithTs : u)));
   };
 
-  const handleUpdateCategory = (cat: Category) => {
-    setCategories(prev => prev.map(c => c.id === cat.id ? cat : c));
-  };
-
-  const handleUpdateIncomeCategory = (cat: IncomeCategory) => {
-    setIncomeCategories(prev => prev.map(c => c.id === cat.id ? cat : c));
-  };
-
-  const handleSaveExpense = (newExpense: Omit<Expense, 'id'>) => {
-    const expense: Expense = { ...newExpense, id: crypto.randomUUID() };
+  const handleSaveExpense = (newExpense: Omit<Expense, 'id' | 'updatedAt'>) => {
+    const expense: Expense = { ...newExpense, id: crypto.randomUUID(), updatedAt: Date.now() };
     setExpenses(prev => [expense, ...prev]);
     setAccounts(prev => prev.map(a => {
       if (a.id !== expense.accountId) return a;
-      if (expense.cardId) return { ...a, cards: a.cards.map(c => c.id === expense.cardId ? {...c, balance: c.balance - expense.amount} : c)};
-      return { ...a, balance: a.balance - expense.amount };
+      const updatedAccount = { ...a, updatedAt: Date.now() };
+      if (expense.cardId) {
+        updatedAccount.cards = a.cards.map(c => c.id === expense.cardId ? {...c, balance: c.balance - expense.amount, updatedAt: Date.now()} : c);
+      } else {
+        updatedAccount.balance = a.balance - expense.amount;
+      }
+      return updatedAccount;
     }));
     setIsFormOpen(false); setIsFabOpen(false);
   };
 
-  const handleSaveIncome = (newIncome: Omit<Income, 'id'>) => {
-    const income: Income = { ...newIncome, id: crypto.randomUUID() };
+  const handleSaveIncome = (newIncome: Omit<Income, 'id' | 'updatedAt'>) => {
+    const income: Income = { ...newIncome, id: crypto.randomUUID(), updatedAt: Date.now() };
     setIncomes(prev => [income, ...prev]);
     setAccounts(prev => prev.map(a => {
       let balance = a.balance;
       if (a.id === income.accountId) balance += income.amount;
       if (income.isInternalTransfer && income.fromAccountId === a.id) balance -= income.amount;
-      return { ...a, balance };
+      return { ...a, balance, updatedAt: Date.now() };
     }));
     setIsIncomeFormOpen(false); setIsFabOpen(false);
   };
 
-  if (!currentUser) return <Auth onLogin={setCurrentUser} />;
+  if (!currentUser) return <Auth onLogin={setCurrentUser} onImportSync={(code) => importFromSyncCode(code, 'merge')} />;
 
   const renderView = () => {
     switch (view) {
       case 'dashboard':
         return <Dashboard expenses={expenses} incomes={incomes} categories={categories} accounts={accounts} incomeCategories={incomeCategories} onOpenSidebar={() => setIsSidebarOpen(true)} onNavigate={navigateTo} savingsJars={savingsJars} />;
       case 'accounts':
-        return <AccountManager accounts={accounts} onAdd={a => setAccounts([...accounts, { ...a, id: crypto.randomUUID() }])} onUpdate={a => setAccounts(accounts.map(acc => acc.id === a.id ? a : acc))} onDelete={id => setAccounts(accounts.filter(a => a.id !== id))} hideBalances={hideBalances} onToggleHideBalances={() => setHideBalances(!hideBalances)} onOpenSidebar={() => setIsSidebarOpen(true)} jars={savingsJars} onAddJar={j => setSavingsJars([...savingsJars, { ...j, id: crypto.randomUUID() }])} onUpdateJar={j => setSavingsJars(savingsJars.map(jar => jar.id === j.id ? j : jar))} onDeleteJar={id => setSavingsJars(savingsJars.filter(j => j.id !== id))} onMoveFunds={() => {}} />;
-      case 'budget_summary':
-        return <BudgetSummary expenses={expenses} categories={categories} incomeCategories={incomeCategories} onUpdateCategory={handleUpdateCategory} onUpdateIncomeCategory={handleUpdateIncomeCategory} onNavigate={navigateTo} onOpenSidebar={() => setIsSidebarOpen(true)} />;
-      case 'search':
-        return <SearchView expenses={expenses} incomes={incomes} categories={categories} incomeCategories={incomeCategories} accounts={accounts} onBack={() => setViewHistory(prev => prev.length > 1 ? prev.slice(0, -1) : ['dashboard'])} onNavigate={navigateTo} language={language} showDecimals={currentUser.settings?.showDecimals ?? true} hideBalances={hideBalances} />;
-      case 'income_list':
-        return <IncomeList incomes={incomes} incomeCategories={incomeCategories} accounts={accounts} onOpenSidebar={() => setIsSidebarOpen(true)} selectedMonth={selectedMonth} selectedYear={selectedYear} onPrevMonth={() => setSelectedMonth(prev => prev === 0 ? 11 : prev - 1)} onNextMonth={() => setSelectedMonth(prev => prev === 11 ? 0 : prev + 1)} hideBalances={hideBalances} onToggleHideBalances={() => setHideBalances(!hideBalances)} onNavigate={navigateTo} onDeleteIncome={id => setIncomes(prev => prev.filter(i => i.id !== id))} showDecimals={currentUser.settings?.showDecimals || true} onEditIncome={setEditingIncome} />;
-      case 'list':
-        return <ExpenseList expenses={expenses} categories={categories} accounts={accounts} onOpenSidebar={() => setIsSidebarOpen(true)} selectedMonth={selectedMonth} selectedYear={selectedYear} onPrevMonth={() => setSelectedMonth(prev => prev === 0 ? 11 : prev - 1)} onNextMonth={() => setSelectedMonth(prev => prev === 11 ? 0 : prev + 1)} hideBalances={hideBalances} onToggleHideBalances={() => setHideBalances(!hideBalances)} onNavigate={navigateTo} onDeleteExpense={id => setExpenses(prev => prev.filter(e => e.id !== id))} language={language} showDecimals={currentUser.settings?.showDecimals || true} onEditExpense={setEditingExpense} />;
-      case 'categories':
-      case 'income_categories':
-        return (
-          <CategoryManager 
-            expensesCategories={categories}
-            incomeCategories={incomeCategories}
-            onAddExpenseCat={c => setCategories([...categories, {...c, id: crypto.randomUUID()}])}
-            onUpdateExpenseCat={handleUpdateCategory}
-            onDeleteExpenseCat={id => setCategories(categories.filter(c => c.id !== id))}
-            onAddIncomeCat={c => setIncomeCategories([...incomeCategories, {...c, id: crypto.randomUUID()}])}
-            onUpdateIncomeCat={handleUpdateIncomeCategory}
-            onDeleteIncomeCat={id => setIncomeCategories(incomeCategories.filter(c => c.id !== id))}
-            onOpenSidebar={() => setIsSidebarOpen(true)}
-          />
-        );
-      case 'bank_sync':
-        return <BankSync categories={categories} incomeCategories={incomeCategories} accounts={accounts} onImport={() => {}} onOpenSidebar={() => setIsSidebarOpen(true)} />;
-      case 'ai_advisor':
-        return <AiAdvisor expenses={expenses} categories={categories} accounts={accounts} onOpenSidebar={() => setIsSidebarOpen(true)} language={language} />;
-      case 'export':
-        return <ExportManager expenses={expenses} incomes={incomes} categories={categories} incomeCategories={incomeCategories} accounts={accounts} onNavigate={navigateTo} onBack={() => setViewHistory(['dashboard'])} onOpenSidebar={() => setIsSidebarOpen(true)} />;
+        return <AccountManager accounts={accounts} onAdd={a => setAccounts([...accounts, { ...a, id: crypto.randomUUID(), updatedAt: Date.now() }])} onUpdate={a => setAccounts(accounts.map(acc => acc.id === a.id ? {...a, updatedAt: Date.now()} : acc))} onDelete={id => setAccounts(accounts.filter(a => a.id !== id))} hideBalances={hideBalances} onToggleHideBalances={() => setHideBalances(!hideBalances)} onOpenSidebar={() => setIsSidebarOpen(true)} jars={savingsJars} onAddJar={j => setSavingsJars([...savingsJars, { ...j, id: crypto.randomUUID(), updatedAt: Date.now() }])} onUpdateJar={j => setSavingsJars(savingsJars.map(jar => jar.id === j.id ? {...j, updatedAt: Date.now()} : jar))} onDeleteJar={id => setSavingsJars(savingsJars.filter(j => j.id !== id))} onMoveFunds={() => {}} />;
       case 'settings':
-        return <Settings expenses={expenses} incomes={incomes} categories={categories} accounts={accounts} onClearData={() => setExpenses([])} onNavigate={navigateTo} onGoToMenu={() => setViewHistory(['dashboard'])} palettes={PALETTES} currentPalette={currentTheme} onPaletteChange={setCurrentTheme} language={language} onLanguageChange={setLanguage} settings={currentUser.settings || DEFAULT_SETTINGS} onUpdateSettings={s => handleUpdateUser({...currentUser, settings: s})} onImportData={() => {}} />;
-      case 'profile':
-        return <ProfileView user={currentUser} onUpdateUser={handleUpdateUser} onNavigate={navigateTo} onBack={() => setViewHistory(['dashboard'])} transactionCount={expenses.length + incomes.length} onOpenSidebar={() => setIsSidebarOpen(true)} />;
-      case 'security':
-        return <SecurityView user={currentUser} onUpdateUser={handleUpdateUser} onBack={() => setViewHistory(['dashboard'])} onOpenSidebar={() => setIsSidebarOpen(true)} />;
-      case 'monthly_reports':
-        return <MonthlyReports expenses={expenses} incomes={incomes} categories={categories} accounts={accounts} onNavigate={navigateTo} onBack={() => setViewHistory(['dashboard'])} onOpenSidebar={() => setIsSidebarOpen(true)} />;
+        return <Settings expenses={expenses} incomes={incomes} categories={categories} accounts={accounts} onClearData={() => setExpenses([])} onNavigate={navigateTo} onGoToMenu={() => setViewHistory(['dashboard'])} palettes={PALETTES} currentPalette={currentTheme} onPaletteChange={setCurrentTheme} language={language} onLanguageChange={setLanguage} settings={currentUser.settings || DEFAULT_SETTINGS} onUpdateSettings={s => handleUpdateUser({...currentUser, settings: s})} onGetSyncCode={generateSyncCode} onImportSync={importFromSyncCode} />;
       default:
         return <Dashboard expenses={expenses} incomes={incomes} categories={categories} accounts={accounts} incomeCategories={incomeCategories} onOpenSidebar={() => setIsSidebarOpen(true)} onNavigate={navigateTo} savingsJars={savingsJars} />;
     }

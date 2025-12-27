@@ -4,125 +4,102 @@ import { User } from '../types';
 
 interface AuthProps {
   onLogin: (user: User) => void;
+  onImportSync: (code: string) => boolean;
 }
 
-type AuthStep = 'login' | 'register';
+type AuthStep = 'login' | 'register' | 'import';
 
-const Auth: React.FC<AuthProps> = ({ onLogin }) => {
+const Auth: React.FC<AuthProps> = ({ onLogin, onImportSync }) => {
   const [step, setStep] = useState<AuthStep>('login');
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+  const [syncCode, setSyncCode] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  const generateId = () => Math.random().toString(36).substring(2, 15);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
-    // Piccolo delay per feedback visivo
-    await new Promise(resolve => setTimeout(resolve, 600));
-    const users: User[] = JSON.parse(localStorage.getItem('registered_users') || '[]');
+    try {
+      await new Promise(resolve => setTimeout(resolve, 800));
+      const users: User[] = JSON.parse(localStorage.getItem('registered_users') || '[]');
 
-    if (step === 'login') {
-      const user = users.find(u => u.email.toLowerCase() === formData.email.toLowerCase() && u.password === formData.password);
-      if (user) {
-        onLogin(user);
-      } else {
-        setError('Email o password errati.');
-        setIsLoading(false);
-      }
-    } else {
-      if (!formData.name || !formData.email || !formData.password) {
-        setError('Compila tutti i campi.');
-        setIsLoading(false);
-        return;
-      }
-      if (users.some(u => u.email.toLowerCase() === formData.email.toLowerCase())) {
-        setError('Email già registrata.');
-        setIsLoading(false);
-        return;
-      }
-
-      const newUser: User = {
-        id: crypto.randomUUID(),
-        name: formData.name,
-        email: formData.email.toLowerCase(),
-        password: formData.password,
-        isVerified: true,
-        settings: {
-          monthlyBudget: 0,
-          firstDayOfMonth: 1,
-          defaultAccountId: '',
-          showDecimals: true,
-          textSize: 'medium'
+      if (step === 'login') {
+        const user = users.find(u => u.email.toLowerCase() === formData.email.toLowerCase() && u.password === formData.password);
+        if (user) onLogin(user);
+        else setError('Credenziali errate.');
+      } else if (step === 'register') {
+        if (users.some(u => u.email.toLowerCase() === formData.email.toLowerCase())) {
+          setError('Email già esistente.');
+        } else {
+          const newUser: User = { 
+            id: generateId(), 
+            ...formData, 
+            updatedAt: Date.now(),
+            settings: { monthlyBudget: 0, firstDayOfMonth: 1, defaultAccountId: '', showDecimals: true, textSize: 'medium' } 
+          };
+          localStorage.setItem('registered_users', JSON.stringify([...users, newUser]));
+          onLogin(newUser);
         }
-      };
-
-      const updatedUsers = [...users, newUser];
-      localStorage.setItem('registered_users', JSON.stringify(updatedUsers));
-      onLogin(newUser);
-    }
+      } else if (step === 'import') {
+        if (onImportSync(syncCode)) {
+          // Successo gestito da App.tsx
+        } else {
+          setError('Codice non valido o corrotto.');
+        }
+      }
+    } catch (err) { setError('Errore imprevisto.'); }
+    setIsLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2] flex flex-col items-center justify-center px-6 animate-in fade-in duration-500">
-      <div className="w-full max-w-sm space-y-10">
-        <div className="text-center space-y-4">
-          <div className="relative w-20 h-20 mx-auto animate-logo">
-            <div className="absolute inset-0 theme-bg-primary rounded-[2rem] rotate-6 opacity-20 scale-110"></div>
-            <div className="relative w-full h-full theme-bg-primary rounded-[2rem] flex items-center justify-center shadow-xl border border-white/20">
-              <span className="text-2xl font-black text-white">FT</span>
-            </div>
-          </div>
-          <div className="pt-2">
-            <h1 className="text-4xl font-black text-[#4A453E] tracking-tighter">FinTrack</h1>
-            <p className="text-[#918B82] font-semibold text-xs uppercase tracking-widest">Risparmio Intelligente</p>
-          </div>
+    <div className="min-h-screen bg-[#FAF7F2] flex flex-col items-center justify-center px-6 animate-in fade-in">
+      <div className="w-full max-w-sm space-y-8">
+        <div className="text-center space-y-3">
+          <div className="w-16 h-16 theme-bg-primary rounded-[1.5rem] flex items-center justify-center text-white font-black text-xl mx-auto shadow-xl">FT</div>
+          <h1 className="text-3xl font-black text-[#4A453E]">FinTrack</h1>
         </div>
 
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-[#EBE4D8] space-y-6 relative overflow-hidden">
-          {isLoading && (
-            <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] z-20 flex items-center justify-center">
-              <div className="w-8 h-8 border-4 theme-border border-t-current theme-primary rounded-full animate-spin"></div>
-            </div>
-          )}
+        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-[#EBE4D8] space-y-6">
+          <h2 className="text-xl font-black text-center text-[#4A453E]">
+            {step === 'login' ? 'Bentornato' : step === 'register' ? 'Nuovo Account' : 'Importa Dati'}
+          </h2>
 
-          <div className="text-center">
-            <h2 className="text-2xl font-black text-[#4A453E]">{step === 'login' ? 'Bentornato' : 'Inizia ora'}</h2>
-          </div>
-
-          {error && <div className="bg-rose-50 text-rose-500 text-[11px] font-bold p-3 rounded-xl text-center border border-rose-100">{error}</div>}
+          {error && <p className="text-rose-500 text-[10px] font-bold text-center bg-rose-50 p-2 rounded-xl">{error}</p>}
 
           <form onSubmit={handleAuth} className="space-y-4">
-            {step === 'register' && (
-              <input 
-                type="text" required
-                className="w-full bg-[#FAF7F2] p-4 rounded-2xl border-none theme-primary font-bold placeholder:font-medium outline-none"
-                value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
-                placeholder="Nome completo"
+            {step === 'import' ? (
+              <textarea 
+                className="w-full h-32 p-4 theme-sub-bg rounded-2xl font-mono text-[10px] outline-none" 
+                placeholder="Incolla qui il tuo Sync Code..."
+                value={syncCode}
+                onChange={e => setSyncCode(e.target.value)}
+                required
               />
+            ) : (
+              <>
+                {step === 'register' && <input type="text" placeholder="Nome" className="w-full p-4 theme-sub-bg rounded-2xl outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required />}
+                <input type="email" placeholder="Email" className="w-full p-4 theme-sub-bg rounded-2xl outline-none" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required />
+                <input type="password" placeholder="Password" className="w-full p-4 theme-sub-bg rounded-2xl outline-none" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} required />
+              </>
             )}
-            <input 
-              type="email" required
-              className="w-full bg-[#FAF7F2] p-4 rounded-2xl border-none theme-primary font-bold placeholder:font-medium outline-none"
-              value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
-              placeholder="Email"
-            />
-            <input 
-              type="password" required
-              className="w-full bg-[#FAF7F2] p-4 rounded-2xl border-none theme-primary font-bold placeholder:font-medium outline-none"
-              value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}
-              placeholder="Password"
-            />
-            <button type="submit" className="w-full py-5 theme-bg-primary text-white rounded-3xl font-black text-[15px] shadow-lg active:scale-95 transition-all">
-              {step === 'login' ? 'Accedi' : 'Crea Account'}
+            <button type="submit" disabled={isLoading} className="w-full py-5 theme-bg-primary text-white rounded-3xl font-black shadow-lg">
+              {isLoading ? 'Attendere...' : step === 'login' ? 'Accedi' : step === 'register' ? 'Registrati' : 'Importa ora'}
             </button>
           </form>
         </div>
 
-        <button onClick={() => setStep(step === 'login' ? 'register' : 'login')} className="w-full text-center theme-primary font-black text-sm hover:underline transition-all">
-          {step === 'login' ? 'Nuovo qui? Registrati ora' : 'Hai già un account? Accedi'}
-        </button>
+        <div className="flex flex-col gap-3">
+          <button onClick={() => setStep(step === 'login' ? 'register' : 'login')} className="text-center theme-primary font-black text-xs">
+            {step === 'login' ? 'Crea un nuovo account' : 'Torna al Login'}
+          </button>
+          <button onClick={() => setStep('import')} className="text-center opacity-40 font-black text-[10px] uppercase tracking-widest">
+            Usa Codice Sincronizzazione
+          </button>
+        </div>
       </div>
     </div>
   );

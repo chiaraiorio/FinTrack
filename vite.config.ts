@@ -11,8 +11,10 @@ export default defineConfig({
     minify: 'terser',
   },
   define: {
-    // Inietta la variabile d'ambiente process.env.API_KEY per il client
-    'process.env.API_KEY': JSON.stringify(process.env.API_KEY)
+    // Garantisce che process.env esista e contenga la chiave API
+    'process.env': {
+      API_KEY: JSON.stringify(process.env.API_KEY || '')
+    }
   },
   server: {
     historyApiFallback: true,

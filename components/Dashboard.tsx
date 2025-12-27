@@ -316,8 +316,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  {/* Fixed TypeScript error: changed (value: number) to (value: any) and added Number() casting to handle 'unknown' type from Recharts */}
-                  <Tooltip formatter={(value: any) => `€${formatVal(Number(value))}`} />
+                  {/* Fixed TypeScript error: correctly cast unknown 'value' to number for formatVal */}
+                  <Tooltip formatter={(value: unknown) => `€${formatVal(Number(value))}`} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -342,8 +342,8 @@ const Dashboard: React.FC<DashboardProps> = ({
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dailyData}>
                 <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#918B82', fontSize: 9, fontWeight: 900}} interval={2} />
-                {/* Fixed TypeScript error: changed (value: number) to (value: any) and added Number() casting to handle 'unknown' type from Recharts */}
-                <Tooltip cursor={{fill: '#F1EBE3'}} formatter={(value: any) => `€${formatVal(Number(value))}`} />
+                {/* Fixed TypeScript error: correctly cast unknown 'value' to number for formatVal */}
+                <Tooltip cursor={{fill: '#F1EBE3'}} formatter={(value: unknown) => `€${formatVal(Number(value))}`} />
                 <Bar dataKey="amount" fill="var(--primary)" radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -359,8 +359,8 @@ const Dashboard: React.FC<DashboardProps> = ({
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData}>
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#918B82', fontSize: 10, fontWeight: 900}} />
-                {/* Fixed TypeScript error: changed (value: number) to (value: any) and added Number() casting to handle 'unknown' type from Recharts */}
-                <Tooltip cursor={{fill: '#F1EBE3'}} formatter={(value: any) => `€${formatVal(Number(value))}`} />
+                {/* Fixed TypeScript error: correctly cast unknown 'value' to number for formatVal */}
+                <Tooltip cursor={{fill: '#F1EBE3'}} formatter={(value: unknown) => `€${formatVal(Number(value))}`} />
                 <Bar dataKey="income" fill="#10B981" radius={[4, 4, 4, 4]} barSize={10} />
                 <Bar dataKey="total" fill="#F43F5E" radius={[4, 4, 4, 4]} barSize={10} />
               </BarChart>

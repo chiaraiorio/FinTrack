@@ -39,30 +39,26 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
     setErrorMessage(null);
     setIsParsing(true);
     
-    try {
-      const reader = new FileReader();
-      if (file.type === 'application/pdf') {
-        reader.onload = async (event) => {
+    const reader = new FileReader();
+    if (file.type === 'application/pdf') {
+      reader.onload = async (event) => {
+        try {
           const result = event.target?.result as string;
           const base64Data = result.split(',')[1];
-          processRequest({ file: { data: base64Data, mimeType: file.type } });
-        };
-        reader.onerror = () => {
-          setErrorMessage("Errore durante la lettura del file PDF.");
+          await processRequest({ file: { data: base64Data, mimeType: file.type } });
+        } catch (err) {
+          setErrorMessage("Errore nel caricamento del file.");
           setIsParsing(false);
-        };
-        reader.readAsDataURL(file);
-      } else {
-        reader.onload = (event) => {
-          const content = event.target?.result as string;
-          setInputText(content);
-          processRequest({ text: content });
-        };
-        reader.readAsText(file);
-      }
-    } catch (err) {
-      setErrorMessage("Impossibile processare il file. Riprova con un altro formato.");
-      setIsParsing(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } else {
+      reader.onload = async (event) => {
+        const content = event.target?.result as string;
+        setInputText(content);
+        await processRequest({ text: content });
+      };
+      reader.readAsText(file);
     }
   };
 
@@ -70,8 +66,8 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
     setErrorMessage(null);
     try {
       const results = await parseBankStatement(input, categories, incomeCategories);
-      if (!results || results.length === 0) {
-        setErrorMessage("L'AI non ha trovato movimenti. Verifica che il PDF sia testuale e non una semplice immagine scansionata male.");
+      if (!results || !Array.isArray(results) || results.length === 0) {
+        setErrorMessage("L'AI non ha trovato movimenti. Se il PDF è una scansione (immagine), l'estrazione potrebbe fallire.");
         setUploadedFileName(null);
       } else {
         const validResults = results.map(r => ({ 
@@ -82,13 +78,13 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
         setPreviewData(validResults);
       }
     } catch (error: any) {
-      console.error(error);
+      console.error("Sync Error:", error);
       if (error.message?.includes("Requested entity was not found")) {
         // @ts-ignore
         if (window.aistudio) await window.aistudio.openSelectKey();
-        setErrorMessage("Chiave API non valida o scaduta. Seleziona una chiave valida.");
+        setErrorMessage("Errore di autorizzazione API. Seleziona una chiave valida.");
       } else {
-        setErrorMessage("Errore tecnico durante l'analisi AI. Prova a copiare e incollare il testo dei movimenti.");
+        setErrorMessage("L'analisi ha richiesto troppo tempo o il file è troppo complesso. Prova con un estratto conto più breve.");
       }
       setUploadedFileName(null);
     } finally {
@@ -138,7 +134,7 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
         </button>
         <div>
           <h1 className="text-4xl font-extrabold text-[#4A453E] tracking-tight">Importa PDF</h1>
-          <p className="text-sm text-[#918B82] font-medium leading-relaxed mt-2">Digitalizza estratti Fineco, BPER e altri in pochi secondi con Gemini Pro.</p>
+          <p className="text-sm text-[#918B82] font-medium leading-relaxed mt-2">Digitalizzazione intelligente per Fineco, BPER e conti italiani.</p>
         </div>
       </header>
 
@@ -151,7 +147,7 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
           )}
 
           <div className="theme-card rounded-[2.5rem] p-6 bg-white border theme-border shadow-sm space-y-4">
-             <label className="text-[10px] font-black theme-primary uppercase tracking-widest px-1">Conto di destinazione</label>
+             <label className="text-[10px] font-black theme-primary uppercase tracking-widest px-1">Accredita su:</label>
              <div className="relative">
                <select 
                  className="w-full p-4 theme-sub-bg rounded-2xl font-bold theme-primary outline-none appearance-none pr-10"
@@ -182,17 +178,16 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
                 )}
               </div>
               <p className="text-xs font-black text-[#4A453E] text-center px-4">
-                {isParsing ? 'Analisi intelligente del PDF...' : (uploadedFileName || 'Tocca per caricare PDF')}
+                {isParsing ? 'Analisi profonda in corso...' : (uploadedFileName || 'Seleziona PDF o trascina qui')}
               </p>
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Massima precisione per Fineco e BPER</p>
               <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".pdf" />
             </div>
 
             <div className="relative pt-4">
-              <label className="text-[10px] font-black opacity-30 uppercase tracking-widest px-1 mb-2 block">Oppure incolla i movimenti</label>
+              <label className="text-[10px] font-black opacity-30 uppercase tracking-widest px-1 mb-2 block">Oppure copia/incolla il testo</label>
               <textarea 
                 className="w-full h-32 p-4 pt-4 theme-sub-bg rounded-2xl font-medium text-sm outline-none resize-none placeholder:text-[#D9D1C5] focus:ring-2 focus:ring-current theme-primary shadow-inner"
-                placeholder="Data | Descrizione | Importo..."
+                placeholder="Es: 12/05/2024 Pagamento Amazon -€25,90..."
                 value={inputText}
                 onChange={e => setInputText(e.target.value)}
                 disabled={isParsing}
@@ -204,7 +199,7 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
               disabled={isParsing || (!inputText.trim() && !uploadedFileName)}
               className="w-full py-5 theme-bg-primary text-white rounded-3xl font-black text-[15px] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
             >
-              {isParsing ? 'Scansione in corso...' : 'Analizza con AI'}
+              {isParsing ? 'Leggo i dati...' : 'Analizza con Gemini Pro'}
             </button>
           </div>
         </div>
@@ -212,8 +207,8 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
         <div className="space-y-6 animate-in slide-in-from-bottom duration-500">
           <div className="flex justify-between items-center px-2">
             <div>
-              <h3 className="font-black text-xl text-[#4A453E]">Revisione</h3>
-              <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Seleziona cosa importare</p>
+              <h3 className="font-black text-xl text-[#4A453E]">Conferma Movimenti</h3>
+              <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Tocca per escludere righe</p>
             </div>
             <span className="bg-white border theme-border px-3 py-1.5 rounded-full text-[10px] font-black theme-primary shadow-sm">
               {previewData.filter(d => !d.disabled).length} RIGHE
@@ -237,7 +232,7 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-[13px] text-[#4A453E] truncate leading-tight">{t.notes}</p>
-                    <p className="text-[9px] opacity-40 font-black uppercase tracking-tight">{t.date} • {cat?.name || 'Da categorizzare'}</p>
+                    <p className="text-[9px] opacity-40 font-black uppercase tracking-tight">{t.date} • {cat?.name || 'Altro'}</p>
                   </div>
                   <div className="text-right">
                     <p className={`font-black text-sm ${isExpense ? 'text-red-500' : 'text-emerald-600'}`}>
@@ -261,7 +256,7 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
               onClick={() => { setPreviewData(null); setUploadedFileName(null); }} 
               className="w-full py-4 theme-sub-bg text-[#918B82] rounded-3xl font-bold active:scale-95 transition-all"
             >
-              Annulla e riprova
+              Annulla
             </button>
           </div>
         </div>

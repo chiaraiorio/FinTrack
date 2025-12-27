@@ -52,21 +52,19 @@ export const parseBankStatement = async (input: BankParseInput, categories: Cate
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const prompt = `
-    Sei un estrattore dati specializzato in estratti conto bancari italiani (Fineco, BPER, Intesa, etc.).
-    Analizza il documento (PDF o Testo) e trasforma TUTTI i movimenti in un array JSON.
+    Sei un assistente esperto in contabilità bancaria italiana. Analizza l'estratto conto allegato (PDF o testo).
+    
+    ISTRUZIONI PER IL LAYOUT:
+    1. **FINECO**: Cerca le colonne "USCITE" e "ENTRATE". Se un valore è in "USCITE", è una SPESA. Se è in "ENTRATE", è un'ENTRATA.
+    2. **BPER / ALTRE**: Cerca la colonna "Importo Euro". Se il numero è preceduto da "-" o è indicato come addebito, è una SPESA. Se è positivo o accredito, è un'ENTRATA.
+    3. **DECIMALI**: Gli importi usano la virgola (es. 10,50). Convertili in formato numerico standard (es. 10.50). L'importo nel JSON deve essere sempre POSITIVO.
+    4. **DATE**: Formato richiesto YYYY-MM-DD.
+    5. **CATEGORIE**: Associa ogni riga all'ID più logico:
+       - USCITE: ${JSON.stringify(categories.map(c => ({ id: c.id, name: c.name })))}
+       - ENTRATE: ${JSON.stringify(incomeCategories.map(c => ({ id: c.id, name: c.name })))}
 
-    ISTRUZIONI CRITICHE PER IL FORMATO ITALIANO:
-    1. **COLONNE IMPORTO**: 
-       - Se vedi colonne separate "USCITE" e "ENTRATE" (tipico Fineco): Se un valore è in USCITE, crea un oggetto con type: "SPESA". Se è in ENTRATE, type: "ENTRATA".
-       - Se vedi una colonna unica "Importo" (tipico BPER): Se il numero è negativo o indica un addebito, type: "SPESA". Se positivo o accredito, type: "ENTRATA".
-    2. **NUMERI E DECIMALI**: Gli estratti conto italiani usano la virgola (,) come separatore decimale (es. 1.250,50). Convertili in numeri validi per il JSON (punto per i decimali, es. 1250.50). L'importo finale nel JSON deve essere sempre POSITIVO.
-    3. **DATE**: Converti le date (es: 07.01.25, 23/10/2025) nel formato standard YYYY-MM-DD.
-    4. **DESCRIZIONE (Note)**: Estrai il beneficiario o la causale completa (es: "Amazon Prime", "Stipendio Sandrini Metalli", "Iperal Costa Volpino"). Rimuovi codici operazione inutili.
-    5. **CATEGORIZZAZIONE**: Usa gli ID forniti. Sii intelligente: "Lidl/Iperal" -> Spesa, "Amazon/Shein" -> Svago o Spesa, "Stipendio" -> Stipendio.
-       - ID USCITE disponibili: ${JSON.stringify(categories.map(c => ({ id: c.id, name: c.name })))}
-       - ID ENTRATE disponibili: ${JSON.stringify(incomeCategories.map(c => ({ id: c.id, name: c.name })))}
-
-    NON saltare righe. Ignora i saldi iniziali/finali, estrai solo i movimenti individuali.
+    Estrai SOLO i singoli movimenti. Ignora i riepiloghi, i saldi iniziali/finali e le competenze.
+    Restituisci un array JSON piatto di oggetti.
   `;
 
   const parts: any[] = [];
@@ -79,18 +77,16 @@ export const parseBankStatement = async (input: BankParseInput, categories: Cate
     });
   }
   
-  if (input.text) {
-    parts.push({ text: `Testo da analizzare: ${input.text}` });
-  }
-  
-  parts.push({ text: prompt });
+  parts.push({ text: input.text ? `${prompt}\n\nTESTO AGGIUNTIVO: ${input.text}` : prompt });
 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: [{ parts }],
       config: {
-        thinkingConfig: { thinkingBudget: 8000 }, // Budget elevato per analisi riga per riga
+        // Configurazione cruciale per Gemini 3: budget di pensiero + limite output
+        thinkingConfig: { thinkingBudget: 10000 },
+        maxOutputTokens: 20000, 
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -109,8 +105,9 @@ export const parseBankStatement = async (input: BankParseInput, categories: Cate
       }
     });
 
-    const data = JSON.parse(response.text || "[]");
-    return Array.isArray(data) ? data : [];
+    const text = response.text;
+    if (!text) throw new Error("Risposta vuota dal modello.");
+    return JSON.parse(text);
   } catch (error) {
     console.error("Gemini Parsing Error:", error);
     throw error;

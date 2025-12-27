@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ViewType } from '../types';
 
 interface LayoutProps {
@@ -11,14 +11,101 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children, activeView, onViewChange, centerButton, language = 'it' }) => {
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const startY = useRef(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const t = {
-    it: { dashboard: 'Dashboard', accounts: 'Conti', income: 'Entrate', expenses: 'Uscite' },
-    en: { dashboard: 'Dashboard', accounts: 'Accounts', income: 'Income', expenses: 'Expenses' }
+    it: { dashboard: 'Dashboard', accounts: 'Conti', income: 'Entrate', expenses: 'Uscite', updating: 'Aggiornamento...' },
+    en: { dashboard: 'Dashboard', accounts: 'Accounts', income: 'Income', expenses: 'Expenses', updating: 'Updating...' }
   }[language];
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (containerRef.current && containerRef.current.scrollTop === 0) {
+      startY.current = e.touches[0].pageY;
+    } else {
+      startY.current = 0;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (startY.current === 0 || isRefreshing) return;
+    
+    const currentY = e.touches[0].pageY;
+    const diff = currentY - startY.current;
+    
+    if (diff > 0) {
+      // Applichiamo una resistenza per rendere il movimento più naturale (logaritmico)
+      const resistance = 0.4;
+      const move = Math.min(diff * resistance, 100);
+      setPullDistance(move);
+      
+      // Impediamo lo scroll nativo se stiamo tirando giù
+      if (diff > 10) {
+        if (e.cancelable) e.preventDefault();
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (pullDistance > 60) {
+      triggerRefresh();
+    } else {
+      setPullDistance(0);
+    }
+    startY.current = 0;
+  };
+
+  const triggerRefresh = () => {
+    setIsRefreshing(true);
+    setPullDistance(70); // Posizione di caricamento
+
+    // Simuliamo un caricamento asincrono
+    setTimeout(() => {
+      setIsRefreshing(false);
+      setPullDistance(0);
+      // Qui potresti triggerare una funzione onRefresh passata come prop se necessario
+    }, 1500);
+  };
 
   return (
     <div className="flex flex-col h-screen max-w-md mx-auto theme-bg-app overflow-hidden relative">
-      <main className="flex-1 overflow-y-auto no-scrollbar pb-32">
+      {/* Indicatore Pull-to-Refresh */}
+      <div 
+        className="absolute w-full flex justify-center z-[100] pointer-events-none transition-all duration-200"
+        style={{ 
+          top: `${pullDistance - 50}px`, 
+          opacity: pullDistance > 20 ? 1 : 0,
+          transform: `scale(${Math.min(pullDistance / 70, 1)})`
+        }}
+      >
+        <div className="bg-white rounded-full p-2 shadow-xl border theme-border flex items-center justify-center">
+          <svg 
+            className={`w-6 h-6 theme-primary ${isRefreshing ? 'animate-spin' : ''}`} 
+            style={{ transform: !isRefreshing ? `rotate(${pullDistance * 3}deg)` : 'none' }}
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          {isRefreshing && (
+            <span className="ml-2 text-[10px] font-black theme-primary uppercase tracking-widest animate-pulse">
+              {t.updating}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <main 
+        ref={containerRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        className="flex-1 overflow-y-auto no-scrollbar pb-32 transition-transform duration-200"
+        style={{ transform: `translateY(${isRefreshing ? 60 : 0}px)` }}
+      >
         {children}
       </main>
 

@@ -37,8 +37,6 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
     budget: ''
   });
 
-  const currentCategories = activeTab === 'expenses' ? expensesCategories : incomeCategories;
-
   useEffect(() => {
     if (editingId) {
       const cat = currentCategories.find(c => c.id === editingId);
@@ -60,12 +58,13 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
 
     const budgetVal = formState.budget ? parseFloat(formState.budget) : undefined;
     
+    // Added updatedAt: Date.now() to satisfy the Category/IncomeCategory types
     if (activeTab === 'expenses') {
-      const payload = { name: formState.name, icon: formState.icon, color: formState.color, budget: budgetVal };
+      const payload = { name: formState.name, icon: formState.icon, color: formState.color, budget: budgetVal, updatedAt: Date.now() };
       if (editingId) onUpdateExpenseCat({ ...payload, id: editingId });
       else onAddExpenseCat(payload);
     } else {
-      const payload = { name: formState.name, icon: formState.icon, color: formState.color };
+      const payload = { name: formState.name, icon: formState.icon, color: formState.color, updatedAt: Date.now() };
       if (editingId) onUpdateIncomeCat({ ...payload, id: editingId });
       else onAddIncomeCat(payload);
     }
@@ -182,7 +181,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
       )}
 
       <div className="space-y-3">
-        {currentCategories.map(c => (
+        {expensesCategories.map(c => (
           <div key={c.id} className="bg-white p-4 rounded-[2rem] flex items-center justify-between border theme-border shadow-sm group active:theme-sub-bg transition-colors">
             <div className="flex items-center gap-4">
               <div className={`w-12 h-12 rounded-[1.2rem] flex items-center justify-center shadow-inner ${activeTab === 'expenses' ? 'theme-sub-bg' : 'bg-emerald-50'}`}>

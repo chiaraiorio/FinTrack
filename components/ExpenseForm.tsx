@@ -7,7 +7,8 @@ import CategoryIcon from './CategoryIcon';
 interface ExpenseFormProps {
   categories: Category[];
   accounts: Account[];
-  onSave: (expense: Omit<Expense, 'id'>) => void;
+  // Changed onSave to omit updatedAt as it is handled in App.tsx
+  onSave: (expense: Omit<Expense, 'id' | 'updatedAt'>) => void;
   onUpdate?: (expense: Expense) => void;
   onClose: () => void;
   initialData?: Expense;
@@ -48,6 +49,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ categories, accounts, onSave,
     if (isNaN(amountNum) || !categoryId || !accountId) return;
     
     if (initialData && onUpdate) {
+      // Added updatedAt to satisfy the Expense type
       onUpdate({
         ...initialData,
         amount: amountNum,
@@ -56,7 +58,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ categories, accounts, onSave,
         cardId: cardId || undefined,
         date,
         notes,
-        repeatability
+        repeatability,
+        updatedAt: Date.now()
       });
     } else {
       onSave({

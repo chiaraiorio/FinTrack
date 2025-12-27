@@ -31,9 +31,9 @@ const AccountManager: React.FC<AccountManagerProps> = ({
   // States per i Form
   const [showAccForm, setShowAccForm] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
-  const [showJarForm, setShowJarForm] = useState<string | null>(null);
+  const [showJarForm, setShowJarForm] = useState<{accId: string, jar?: SavingsJar} | null>(null);
   const [showCardForm, setShowCardForm] = useState<{accId: string, card?: LinkedCard} | null>(null);
-  const [activeTransfer, setActiveTransfer] = useState<{from: any, jar?: SavingsJar, card?: LinkedCard} | null>(null);
+  const [activeTransfer, setActiveTransfer] = useState<{fromAccId: string, jar?: SavingsJar, card?: LinkedCard} | null>(null);
   
   // Account Form Fields
   const [accName, setAccName] = useState('');
@@ -46,7 +46,7 @@ const AccountManager: React.FC<AccountManagerProps> = ({
   const [cardBalance, setCardBalance] = useState('');
   const [cardType, setCardType] = useState<'Credito' | 'Prepagata' | 'Debito'>('Debito');
 
-  // Jar/Transfer Fields
+  // Jar Fields
   const [jarName, setJarName] = useState('');
   const [jarTarget, setJarTarget] = useState('');
   const [txAmount, setTxAmount] = useState('');
@@ -78,6 +78,16 @@ const AccountManager: React.FC<AccountManagerProps> = ({
     }
   }, [showCardForm]);
 
+  useEffect(() => {
+    if (showJarForm?.jar) {
+      setJarName(showJarForm.jar.name);
+      setJarTarget(showJarForm.jar.targetAmount.toString());
+    } else {
+      setJarName('');
+      setJarTarget('');
+    }
+  }, [showJarForm]);
+
   const handleAccSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!accName.trim()) return;
@@ -86,7 +96,7 @@ const AccountManager: React.FC<AccountManagerProps> = ({
       onUpdate({
         ...editingAccount,
         name: accName,
-        balance: parseFloat(accBalance) || 0,
+        balance: parseFloat(accBalance.replace(',', '.')) || 0,
         type: accType,
         color: accColor,
         updatedAt: Date.now()
@@ -95,7 +105,7 @@ const AccountManager: React.FC<AccountManagerProps> = ({
     } else {
       onAdd({ 
         name: accName, 
-        balance: parseFloat(accBalance) || 0, 
+        balance: parseFloat(accBalance.replace(',', '.')) || 0, 
         type: accType, 
         color: accColor, 
         cards: [], 
@@ -118,17 +128,17 @@ const AccountManager: React.FC<AccountManagerProps> = ({
     const acc = accounts.find(a => a.id === showCardForm.accId);
     if (!acc) return;
 
+    const balanceNum = parseFloat(cardBalance.replace(',', '.')) || 0;
+
     if (showCardForm.card) {
-      // Modifica carta esistente
       const updatedCards = acc.cards.map(c => 
         c.id === showCardForm.card?.id 
-        ? { ...c, name: cardName, balance: parseFloat(cardBalance) || 0, type: cardType, updatedAt: Date.now() }
+        ? { ...c, name: cardName, balance: balanceNum, type: cardType, updatedAt: Date.now() }
         : c
       );
       onUpdate({ ...acc, cards: updatedCards });
     } else {
-      // Nuova carta
-      const newCard: LinkedCard = { id: crypto.randomUUID(), name: cardName, balance: parseFloat(cardBalance) || 0, type: cardType, updatedAt: Date.now() };
+      const newCard: LinkedCard = { id: crypto.randomUUID(), name: cardName, balance: balanceNum, type: cardType, updatedAt: Date.now() };
       onUpdate({ ...acc, cards: [...acc.cards, newCard] });
     }
     setShowCardForm(null);
@@ -146,8 +156,34 @@ const AccountManager: React.FC<AccountManagerProps> = ({
   const handleJarSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!jarName.trim() || !jarTarget || !showJarForm) return;
-    onAddJar({ name: jarName, targetAmount: parseFloat(jarTarget) || 0, currentAmount: 0, accountId: showJarForm, color: '#8E7C68', icon: 'briefcase', updatedAt: Date.now() });
+    
+    const targetNum = parseFloat(jarTarget.replace(',', '.')) || 0;
+
+    if (showJarForm.jar) {
+      onUpdateJar({
+        ...showJarForm.jar,
+        name: jarName,
+        targetAmount: targetNum,
+        updatedAt: Date.now()
+      });
+    } else {
+      onAddJar({ 
+        name: jarName, 
+        targetAmount: targetNum, 
+        currentAmount: 0, 
+        accountId: showJarForm.accId, 
+        color: '#8E7C68', 
+        icon: 'briefcase', 
+        updatedAt: Date.now() 
+      });
+    }
     setJarName(''); setJarTarget(''); setShowJarForm(null);
+  };
+
+  const handleDeleteJar = (id: string) => {
+    if (window.confirm("Eliminare questo salvadanaio?")) {
+      onDeleteJar(id);
+    }
   };
 
   const moveAccount = (index: number, direction: 'up' | 'down') => {
@@ -159,18 +195,22 @@ const AccountManager: React.FC<AccountManagerProps> = ({
     }
   };
 
-  const executeTransfer = (isToJar: boolean) => {
-    const amount = parseFloat(txAmount);
+  const executeTransfer = (isToDestination: boolean) => {
+    const amount = parseFloat(txAmount.replace(',', '.'));
     if (!activeTransfer || isNaN(amount) || amount <= 0) return;
     
     if (activeTransfer.jar) {
-      const from = isToJar ? {type: 'acc' as const, id: activeTransfer.from} : {type: 'jar' as const, id: activeTransfer.jar.id};
-      const to = isToJar ? {type: 'jar' as const, id: activeTransfer.jar.id} : {type: 'acc' as const, id: activeTransfer.from};
-      onMoveFunds(amount, from, to, isToJar ? `Risparmio per ${activeTransfer.jar.name}` : `Prelievo da ${activeTransfer.jar.name}`);
+      // isToDestination = true -> VERSA (Conto -> Salvadanaio)
+      // isToDestination = false -> PRELEVA (Salvadanaio -> Conto)
+      const from = isToDestination ? {type: 'acc' as const, id: activeTransfer.fromAccId} : {type: 'jar' as const, id: activeTransfer.jar.id};
+      const to = isToDestination ? {type: 'jar' as const, id: activeTransfer.jar.id} : {type: 'acc' as const, id: activeTransfer.fromAccId};
+      onMoveFunds(amount, from, to, isToDestination ? `Risparmio per ${activeTransfer.jar.name}` : `Prelievo da ${activeTransfer.jar.name}`);
     } else if (activeTransfer.card) {
-      const from = isToJar ? {type: 'acc' as const, id: activeTransfer.from} : {type: 'card' as const, id: activeTransfer.card.id};
-      const to = isToJar ? {type: 'card' as const, id: activeTransfer.card.id} : {type: 'acc' as const, id: activeTransfer.from};
-      onMoveFunds(amount, from, to, isToJar ? `Ricarica ${activeTransfer.card.name}` : `Storno da ${activeTransfer.card.name}`);
+      // isToDestination = true -> RICARICA (Conto -> Carta)
+      // isToDestination = false -> STORNO (Carta -> Conto)
+      const from = isToDestination ? {type: 'acc' as const, id: activeTransfer.fromAccId} : {type: 'card' as const, id: activeTransfer.card.id};
+      const to = isToDestination ? {type: 'card' as const, id: activeTransfer.card.id} : {type: 'acc' as const, id: activeTransfer.fromAccId};
+      onMoveFunds(amount, from, to, isToDestination ? `Ricarica ${activeTransfer.card.name}` : `Storno da ${activeTransfer.card.name}`);
     }
     
     setActiveTransfer(null);
@@ -181,10 +221,10 @@ const AccountManager: React.FC<AccountManagerProps> = ({
     <div className="px-5 pt-12 space-y-8 pb-40">
       <header className="flex flex-col gap-4">
         <div className="flex justify-between items-center">
-          <button onClick={onOpenSidebar} className="w-10 h-10 theme-card rounded-full flex items-center justify-center active:scale-90 transition-transform">
+          <button onClick={onOpenSidebar} className="w-10 h-10 theme-card rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-sm">
             <svg className="w-6 h-6 theme-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16m-7 6h7" /></svg>
           </button>
-          <button onClick={onToggleHideBalances} className="w-10 h-10 theme-card rounded-full flex items-center justify-center theme-primary">
+          <button onClick={onToggleHideBalances} className="w-10 h-10 theme-card rounded-full flex items-center justify-center theme-primary shadow-sm">
             {hideBalances ? <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" /></svg> : <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>}
           </button>
         </div>
@@ -265,9 +305,9 @@ const AccountManager: React.FC<AccountManagerProps> = ({
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <p className="text-sm font-black text-[#4A453E] mr-2">€{card.balance.toLocaleString('it-IT')}</p>
-                            <button onClick={() => setShowCardForm({accId: a.id, card: card})} className="p-2 bg-white text-blue-500 rounded-lg shadow-sm hover:bg-blue-50"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
-                            <button onClick={() => handleDeleteCard(a.id, card.id)} className="p-2 bg-white text-rose-500 rounded-lg shadow-sm hover:bg-rose-50"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
-                            <button onClick={() => setActiveTransfer({from: a.id, card: card})} className="p-2 theme-primary bg-white rounded-lg shadow-sm active:scale-90 transition-transform"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg></button>
+                            <button onClick={() => setShowCardForm({accId: a.id, card: card})} className="p-2 bg-white text-blue-500 rounded-lg shadow-sm hover:bg-blue-50 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
+                            <button onClick={() => handleDeleteCard(a.id, card.id)} className="p-2 bg-white text-rose-500 rounded-lg shadow-sm hover:bg-rose-50 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+                            <button onClick={() => setActiveTransfer({fromAccId: a.id, card: card})} className="p-2 theme-primary bg-white rounded-lg shadow-sm active:scale-90 transition-transform"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg></button>
                           </div>
                         </div>
                       ))}
@@ -277,7 +317,7 @@ const AccountManager: React.FC<AccountManagerProps> = ({
                   <div className="space-y-4">
                     <div className="flex justify-between items-center px-1">
                       <h5 className="text-[10px] font-black opacity-50 uppercase tracking-widest">Salvadanai</h5>
-                      <button onClick={() => setShowJarForm(a.id)} className="text-[10px] font-black uppercase theme-primary">+ Crea</button>
+                      <button onClick={() => setShowJarForm({accId: a.id})} className="text-[10px] font-black uppercase theme-primary">+ Crea</button>
                     </div>
                     <div className="grid grid-cols-1 gap-3">
                       {accountJars.map(jar => {
@@ -291,15 +331,19 @@ const AccountManager: React.FC<AccountManagerProps> = ({
                                 </div>
                                 <span className="text-xs font-black text-[#4A453E] truncate">{jar.name}</span>
                               </div>
-                              <button onClick={() => setActiveTransfer({from: a.id, jar: jar})} className="px-2 py-1 bg-white rounded-lg text-[7px] font-black theme-primary uppercase tracking-tighter shadow-sm active:scale-95 border theme-border flex-shrink-0">Sposta</button>
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <button onClick={() => setShowJarForm({accId: a.id, jar: jar})} className="p-1.5 bg-white text-blue-500 rounded-lg shadow-sm active:scale-95"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
+                                <button onClick={() => handleDeleteJar(jar.id)} className="p-1.5 bg-white text-rose-500 rounded-lg shadow-sm active:scale-95"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+                                <button onClick={() => setActiveTransfer({fromAccId: a.id, jar: jar})} className="px-3 py-1.5 bg-white rounded-lg text-[8px] font-black theme-primary uppercase tracking-tighter shadow-sm active:scale-95 border theme-border">Sposta</button>
+                              </div>
                             </div>
                             <div className="space-y-1.5 px-1">
                               <div className="flex justify-between items-baseline">
-                                <p className="text-sm font-black text-[#4A453E]">€{jar.currentAmount.toLocaleString()} <span className="text-[9px] opacity-30 font-bold">/ {jar.targetAmount.toLocaleString()}</span></p>
+                                <p className="text-sm font-black text-[#4A453E]">€{jar.currentAmount.toLocaleString('it-IT')} <span className="text-[9px] opacity-30 font-bold">/ {jar.targetAmount.toLocaleString('it-IT')}</span></p>
                                 <span className="text-[9px] font-black theme-primary">{progress.toFixed(0)}%</span>
                               </div>
                               <div className="w-full h-1.5 bg-white rounded-full overflow-hidden">
-                                <div className="h-full theme-bg-primary transition-all duration-700" style={{ width: `${progress}%` }} />
+                                <div className="h-full theme-bg-primary transition-all duration-700" style={{ width: `${Math.min(progress, 100)}%` }} />
                               </div>
                             </div>
                           </div>
@@ -325,7 +369,7 @@ const AccountManager: React.FC<AccountManagerProps> = ({
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black opacity-30 uppercase ml-2 tracking-widest">Saldo (€)</label>
-                <input type="number" step="0.01" placeholder="0.00" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none border theme-border" value={accBalance} onChange={e => setAccBalance(e.target.value)} required />
+                <input type="text" inputMode="decimal" placeholder="0,00" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none border theme-border" value={accBalance} onChange={e => setAccBalance(e.target.value)} required />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black opacity-30 uppercase ml-2 tracking-widest">Tipologia</label>
@@ -359,7 +403,7 @@ const AccountManager: React.FC<AccountManagerProps> = ({
             <h3 className="text-xl font-black text-center text-[#4A453E]">{showCardForm.card ? 'Modifica Carta' : 'Aggiungi Carta'}</h3>
             <div className="space-y-4">
               <input type="text" placeholder="Nome Carta" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={cardName} onChange={e => setCardName(e.target.value)} required />
-              <input type="number" step="0.01" placeholder="Saldo Attuale" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={cardBalance} onChange={e => setCardBalance(e.target.value)} required />
+              <input type="text" inputMode="decimal" placeholder="Saldo Attuale" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={cardBalance} onChange={e => setCardBalance(e.target.value)} required />
               <select className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={cardType} onChange={e => setCardType(e.target.value as any)}>
                 <option value="Debito">Debito</option>
                 <option value="Prepagata">Prepagata</option>
@@ -377,13 +421,13 @@ const AccountManager: React.FC<AccountManagerProps> = ({
       {showJarForm && (
         <div className="fixed inset-0 bg-[#4A453E]/40 backdrop-blur-sm z-[110] flex items-center justify-center p-6">
           <form onSubmit={handleJarSubmit} className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl space-y-6">
-            <h3 className="text-xl font-black text-center text-[#4A453E]">Nuovo Risparmio</h3>
+            <h3 className="text-xl font-black text-center text-[#4A453E]">{showJarForm.jar ? 'Modifica Salvadanaio' : 'Nuovo Risparmio'}</h3>
             <div className="space-y-4">
               <input type="text" placeholder="Cosa stai risparmiando?" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={jarName} onChange={e => setJarName(e.target.value)} required />
-              <input type="number" placeholder="Obiettivo (€)" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={jarTarget} onChange={e => setJarTarget(e.target.value)} required />
+              <input type="text" inputMode="decimal" placeholder="Obiettivo (€)" className="w-full p-4 theme-sub-bg rounded-2xl theme-primary font-bold outline-none" value={jarTarget} onChange={e => setJarTarget(e.target.value)} required />
             </div>
             <div className="flex gap-2">
-              <button type="submit" className="flex-1 py-4 theme-bg-primary text-white rounded-2xl font-black text-sm">Crea</button>
+              <button type="submit" className="flex-1 py-4 theme-bg-primary text-white rounded-2xl font-black text-sm">{showJarForm.jar ? 'Salva' : 'Crea'}</button>
               <button type="button" onClick={() => setShowJarForm(null)} className="px-6 py-4 theme-sub-bg text-[#918B82] rounded-2xl font-black text-sm">Indietro</button>
             </div>
           </form>
@@ -400,12 +444,12 @@ const AccountManager: React.FC<AccountManagerProps> = ({
             <div className="space-y-4">
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black theme-primary">€</span>
-                <input type="number" autoFocus className="w-full pl-8 pr-4 py-4 bg-[#FAF7F2] rounded-2xl text-2xl font-black theme-primary outline-none text-center" placeholder="0.00" value={txAmount} onChange={e => setTxAmount(e.target.value)} />
+                <input type="text" inputMode="decimal" autoFocus className="w-full pl-8 pr-4 py-4 bg-[#FAF7F2] rounded-2xl text-2xl font-black theme-primary outline-none text-center" placeholder="0,00" value={txAmount} onChange={e => setTxAmount(e.target.value)} />
               </div>
             </div>
             <div className="flex flex-col gap-2">
-              <button onClick={() => executeTransfer(true)} className="w-full py-4 theme-bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-transform">Versa</button>
-              <button onClick={() => executeTransfer(false)} className="w-full py-4 bg-rose-50 text-rose-500 rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-transform border border-rose-100">Preleva</button>
+              <button onClick={() => executeTransfer(true)} className="w-full py-4 theme-bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-transform">Sposta in {activeTransfer.jar ? 'Salvadanaio' : 'Carta'}</button>
+              <button onClick={() => executeTransfer(false)} className="w-full py-4 bg-rose-50 text-rose-500 rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-transform border border-rose-100">Riporta nel Conto</button>
               <button onClick={() => setActiveTransfer(null)} className="w-full py-3 text-[#918B82] font-bold text-xs uppercase tracking-widest mt-2">Chiudi</button>
             </div>
           </div>

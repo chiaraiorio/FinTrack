@@ -198,6 +198,38 @@ const App: React.FC = () => {
     setAccounts(newAccounts);
   };
 
+  const handleMoveFunds = (amount: number, from: {type: 'acc' | 'card' | 'jar', id: string}, to: {type: 'acc' | 'card' | 'jar', id: string}, notes: string) => {
+    // Aggiorna Sorgente (Sottrae)
+    if (from.type === 'jar') {
+      setSavingsJars(prev => prev.map(j => j.id === from.id ? { ...j, currentAmount: j.currentAmount - amount, updatedAt: Date.now() } : j));
+    } else {
+      setAccounts(prev => prev.map(acc => {
+        if (from.type === 'acc' && acc.id === from.id) {
+          return { ...acc, balance: acc.balance - amount, updatedAt: Date.now() };
+        }
+        if (from.type === 'card' && acc.cards.some(c => c.id === from.id)) {
+          return { ...acc, cards: acc.cards.map(c => c.id === from.id ? { ...c, balance: c.balance - amount, updatedAt: Date.now() } : c), updatedAt: Date.now() };
+        }
+        return acc;
+      }));
+    }
+
+    // Aggiorna Destinazione (Aggiunge)
+    if (to.type === 'jar') {
+      setSavingsJars(prev => prev.map(j => j.id === to.id ? { ...j, currentAmount: j.currentAmount + amount, updatedAt: Date.now() } : j));
+    } else {
+      setAccounts(prev => prev.map(acc => {
+        if (to.type === 'acc' && acc.id === to.id) {
+          return { ...acc, balance: acc.balance + amount, updatedAt: Date.now() };
+        }
+        if (to.type === 'card' && acc.cards.some(c => c.id === to.id)) {
+          return { ...acc, cards: acc.cards.map(c => c.id === to.id ? { ...c, balance: c.balance + amount, updatedAt: Date.now() } : c), updatedAt: Date.now() };
+        }
+        return acc;
+      }));
+    }
+  };
+
   const handleImportTransactions = (transactions: any[]) => {
     transactions.forEach(t => {
       if (t.type === 'SPESA') {
@@ -229,7 +261,21 @@ const App: React.FC = () => {
       case 'dashboard':
         return <Dashboard expenses={expenses} incomes={incomes} categories={categories} accounts={accounts} incomeCategories={incomeCategories} onOpenSidebar={() => setIsSidebarOpen(true)} onNavigate={navigateTo} savingsJars={savingsJars} />;
       case 'accounts':
-        return <AccountManager accounts={accounts} onAdd={a => setAccounts([...accounts, { ...a, id: crypto.randomUUID(), updatedAt: Date.now() }])} onUpdate={a => setAccounts(accounts.map(acc => acc.id === a.id ? a : acc))} onDelete={id => setAccounts(accounts.filter(a => a.id !== id))} onReorder={handleReorderAccounts} hideBalances={hideBalances} onToggleHideBalances={() => setHideBalances(!hideBalances)} onOpenSidebar={() => setIsSidebarOpen(true)} jars={savingsJars} onAddJar={j => setSavingsJars([...savingsJars, { ...j, id: crypto.randomUUID(), updatedAt: Date.now() }])} onUpdateJar={j => setSavingsJars(savingsJars.map(jar => jar.id === j.id ? j : jar))} onDeleteJar={id => setSavingsJars(savingsJars.filter(j => j.id !== id))} onMoveFunds={() => {}} />;
+        return <AccountManager 
+          accounts={accounts} 
+          onAdd={a => setAccounts(prev => [...prev, { ...a, id: crypto.randomUUID(), updatedAt: Date.now() }])} 
+          onUpdate={a => setAccounts(prev => prev.map(acc => acc.id === a.id ? a : acc))} 
+          onDelete={id => setAccounts(prev => prev.filter(a => a.id !== id))} 
+          onReorder={handleReorderAccounts} 
+          hideBalances={hideBalances} 
+          onToggleHideBalances={() => setHideBalances(!hideBalances)} 
+          onOpenSidebar={() => setIsSidebarOpen(true)} 
+          jars={savingsJars} 
+          onAddJar={j => setSavingsJars(prev => [...prev, { ...j, id: crypto.randomUUID(), updatedAt: Date.now() }])} 
+          onUpdateJar={j => setSavingsJars(prev => prev.map(jar => jar.id === j.id ? j : jar))} 
+          onDeleteJar={id => setSavingsJars(prev => prev.filter(j => j.id !== id))} 
+          onMoveFunds={handleMoveFunds} 
+        />;
       case 'list':
         return <ExpenseList expenses={expenses} categories={categories} accounts={accounts} onOpenSidebar={() => setIsSidebarOpen(true)} onNavigate={navigateTo} onDeleteExpense={id => setExpenses(expenses.filter(e => e.id !== id))} onEditExpense={() => {}} language={settings.language} showDecimals={settings.showDecimals} hideBalances={hideBalances} />;
       case 'income_list':
@@ -245,7 +291,7 @@ const App: React.FC = () => {
       case 'monthly_reports':
         return <MonthlyReports expenses={expenses} incomes={incomes} categories={categories} accounts={accounts} onNavigate={navigateTo} onBack={() => setView('dashboard')} onOpenSidebar={() => setIsSidebarOpen(true)} />;
       case 'settings':
-        return <Settings expenses={expenses} incomes={incomes} categories={categories} accounts={accounts} onClearData={() => { if(window.confirm('Cancellare tutto definitivamente?')) { setExpenses([]); setIncomes([]); setAccounts(INITIAL_ACCOUNTS); } }} onNavigate={navigateTo} onGoToMenu={() => setView('dashboard')} palettes={PALETTES} currentPalette={currentPalette} onPaletteChange={setCurrentPalette} language={settings.language} settings={settings} onUpdateSettings={setSettings} onGetSyncCode={() => 'SYNC-' + currentUser.id} onImportSync={() => false} onOpenSidebar={() => setIsSidebarOpen(true)} />;
+        return <Settings expenses={expenses} incomes={incomes} categories={categories} accounts={accounts} onClearData={() => { if(window.confirm('Cancellare tutto definitivamente?')) { setExpenses([]); setIncomes([]); setAccounts(INITIAL_ACCOUNTS); setSavingsJars([]); } }} onNavigate={navigateTo} onGoToMenu={() => setView('dashboard')} palettes={PALETTES} currentPalette={currentPalette} onPaletteChange={setCurrentPalette} language={settings.language} settings={settings} onUpdateSettings={setSettings} onGetSyncCode={() => 'SYNC-' + currentUser.id} onImportSync={() => false} onOpenSidebar={() => setIsSidebarOpen(true)} />;
       case 'search':
         return <SearchView expenses={expenses} incomes={incomes} categories={categories} incomeCategories={incomeCategories} accounts={accounts} onBack={() => setView('dashboard')} onNavigate={navigateTo} language={settings.language} showDecimals={settings.showDecimals} hideBalances={hideBalances} />;
       case 'profile':

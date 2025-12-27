@@ -6,7 +6,8 @@ import CategoryIcon from './CategoryIcon';
 interface IncomeFormProps {
   accounts: Account[];
   incomeCategories: IncomeCategory[];
-  onSave: (income: Omit<Income, 'id'>) => void;
+  // Changed onSave to omit updatedAt as it is handled in App.tsx
+  onSave: (income: Omit<Income, 'id' | 'updatedAt'>) => void;
   onUpdate?: (income: Income) => void;
   onClose: () => void;
   initialData?: Income;
@@ -58,9 +59,11 @@ const IncomeForm: React.FC<IncomeFormProps> = ({ accounts, incomeCategories, onS
     };
 
     if (initialData && onUpdate) {
+      // Added updatedAt: Date.now() to satisfy the Income type
       onUpdate({
         ...initialData,
-        ...payload
+        ...payload,
+        updatedAt: Date.now()
       });
     } else {
       onSave(payload);

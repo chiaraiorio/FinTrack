@@ -31,10 +31,11 @@ const IncomeCategoryManager: React.FC<IncomeCategoryManagerProps> = ({ categorie
     e.preventDefault();
     if (!formState.name.trim()) return;
 
+    // Added updatedAt: Date.now() to satisfy the IncomeCategory type
     if (editingCategoryId) {
-      onUpdate({ ...formState, id: editingCategoryId });
+      onUpdate({ ...formState, id: editingCategoryId, updatedAt: Date.now() });
     } else {
-      onAdd(formState);
+      onAdd({ ...formState, updatedAt: Date.now() });
     }
 
     resetForm();

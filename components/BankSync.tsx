@@ -18,6 +18,7 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
   const [previewData, setPreviewData] = useState<any[] | null>(null);
   const [defaultAccountId, setDefaultAccountId] = useState(accounts[0]?.id || '');
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -25,16 +26,16 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
     if (!file) return;
 
     setUploadedFileName(file.name);
+    setErrorMessage(null);
     
+    const reader = new FileReader();
     if (file.type === 'application/pdf') {
-      const reader = new FileReader();
       reader.onload = async (event) => {
         const base64Data = (event.target?.result as string).split(',')[1];
         processRequest({ file: { data: base64Data, mimeType: file.type } });
       };
       reader.readAsDataURL(file);
     } else {
-      const reader = new FileReader();
       reader.onload = (event) => {
         const content = event.target?.result as string;
         setInputText(content);
@@ -46,17 +47,23 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
 
   const processRequest = async (input: BankParseInput) => {
     setIsParsing(true);
+    setErrorMessage(null);
     try {
       const results = await parseBankStatement(input, categories, incomeCategories);
-      // Assegniamo il conto predefinito a tutti i movimenti inizialmente
-      const validResults = results.filter(r => r.amount && r.date && r.type).map(r => ({ 
-        ...r, 
-        disabled: false,
-        accountId: defaultAccountId 
-      }));
-      setPreviewData(validResults);
+      if (results.length === 0) {
+        setErrorMessage("Non ho trovato movimenti validi in questo documento. Assicurati che non sia protetto da password o che il testo sia selezionabile.");
+        setUploadedFileName(null);
+      } else {
+        const validResults = results.map(r => ({ 
+          ...r, 
+          disabled: false,
+          accountId: defaultAccountId 
+        }));
+        setPreviewData(validResults);
+      }
     } catch (error) {
-      alert("Errore durante l'analisi. Se il PDF è protetto da password o è una scansione di bassa qualità, prova a copiare e incollare il testo.");
+      setErrorMessage("Errore durante l'analisi. Se il PDF è un'immagine/scansione, l'AI potrebbe avere difficoltà. Prova a copiare e incollare il testo dei movimenti qui sotto.");
+      setUploadedFileName(null);
     } finally {
       setIsParsing(false);
     }
@@ -109,14 +116,20 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
         </button>
         <div>
           <h1 className="text-4xl font-extrabold text-[#4A453E] tracking-tight">Importa Dati</h1>
-          <p className="text-sm text-[#918B82] font-medium leading-relaxed mt-2">Digitalizza il tuo estratto conto e scegli su quali conti registrare i movimenti.</p>
+          <p className="text-sm text-[#918B82] font-medium leading-relaxed mt-2">Digitalizza il tuo estratto conto PDF o copia il testo dei movimenti.</p>
         </div>
       </header>
 
       {!previewData ? (
         <div className="space-y-6">
+          {errorMessage && (
+            <div className="bg-rose-50 border border-rose-100 p-4 rounded-2xl text-rose-600 text-xs font-bold animate-in shake duration-500">
+              {errorMessage}
+            </div>
+          )}
+
           <div className="theme-card rounded-[2.5rem] p-6 bg-white border theme-border shadow-sm space-y-4">
-             <label className="text-[10px] font-black theme-primary uppercase tracking-widest px-1">1. Conto Predefinito</label>
+             <label className="text-[10px] font-black theme-primary uppercase tracking-widest px-1">1. Conto di destinazione</label>
              <div className="relative">
                <select 
                  className="w-full p-4 theme-sub-bg rounded-2xl font-bold theme-primary outline-none appearance-none pr-10"
@@ -132,27 +145,33 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
           </div>
 
           <div className="theme-card rounded-[2.5rem] p-6 bg-white border theme-border shadow-sm space-y-5">
-            <label className="text-[10px] font-black theme-primary uppercase tracking-widest px-1">2. Carica Documento</label>
+            <label className="text-[10px] font-black theme-primary uppercase tracking-widest px-1">2. Carica Estratto Conto</label>
             
             <div 
-              onClick={() => fileInputRef.current?.click()}
-              className={`border-2 border-dashed theme-border rounded-3xl p-8 flex flex-col items-center justify-center gap-3 hover:bg-gray-50 transition-colors cursor-pointer group ${uploadedFileName ? 'bg-emerald-50/30 border-emerald-200' : ''}`}
+              onClick={() => !isParsing && fileInputRef.current?.click()}
+              className={`border-2 border-dashed theme-border rounded-3xl p-10 flex flex-col items-center justify-center gap-3 hover:bg-gray-50 transition-colors cursor-pointer group ${uploadedFileName ? 'bg-emerald-50/30 border-emerald-200' : ''} ${isParsing ? 'opacity-50 cursor-wait' : ''}`}
             >
-              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${uploadedFileName ? 'bg-emerald-100 text-emerald-600' : 'theme-sub-bg theme-primary'}`}>
-                {uploadedFileName ? (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${uploadedFileName ? 'bg-emerald-100 text-emerald-600' : 'theme-sub-bg theme-primary'}`}>
+                {isParsing ? (
+                  <svg className="w-8 h-8 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                ) : uploadedFileName ? (
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 ) : (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                 )}
               </div>
-              <p className="text-xs font-bold text-[#4A453E]">{uploadedFileName || 'Scegli PDF o Trascina'}</p>
+              <p className="text-xs font-black text-[#4A453E] text-center px-4">
+                {isParsing ? 'Analisi movimenti...' : (uploadedFileName || 'Seleziona PDF bancario')}
+              </p>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Caricamento sicuro e privato</p>
               <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".pdf,.csv,.txt" />
             </div>
 
-            <div className="relative">
+            <div className="relative pt-4">
+              <label className="text-[10px] font-black opacity-30 uppercase tracking-widest px-1 mb-2 block">Oppure incolla testo</label>
               <textarea 
                 className="w-full h-32 p-4 pt-4 theme-sub-bg rounded-2xl font-medium text-sm outline-none resize-none placeholder:text-[#D9D1C5] focus:ring-2 focus:ring-current theme-primary shadow-inner"
-                placeholder="Oppure incolla qui il testo dei movimenti..."
+                placeholder="Data | Descrizione | Importo..."
                 value={inputText}
                 onChange={e => setInputText(e.target.value)}
               />
@@ -163,17 +182,7 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
               disabled={isParsing || (!inputText.trim() && !uploadedFileName)}
               className="w-full py-5 theme-bg-primary text-white rounded-3xl font-black text-[15px] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
             >
-              {isParsing ? (
-                <>
-                  <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                  Analisi in corso...
-                </>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                  Importa con AI
-                </span>
-              )}
+              {isParsing ? 'Analisi AI in corso...' : 'Inizia Importazione'}
             </button>
           </div>
         </div>
@@ -182,7 +191,7 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
           <div className="flex justify-between items-center px-2">
             <div>
               <h3 className="font-black text-xl text-[#4A453E]">Revisione</h3>
-              <p className="text-[10px] font-bold theme-primary uppercase opacity-60">Puoi cambiare il conto per ogni riga</p>
+              <p className="text-[10px] font-bold theme-primary uppercase opacity-60">Scegli quali movimenti salvare</p>
             </div>
             <span className="bg-white border theme-border px-3 py-1.5 rounded-full text-[10px] font-black theme-primary shadow-sm">
               {previewData.filter(d => !d.disabled).length} MOVIMENTI
@@ -198,7 +207,7 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
               return (
                 <div 
                   key={idx} 
-                  className={`p-4 rounded-[2rem] flex flex-col gap-3 border transition-all ${t.disabled ? 'opacity-30 bg-gray-100 grayscale' : 'bg-white border-white shadow-sm'}`}
+                  className={`p-4 rounded-[2rem] flex flex-col gap-3 border transition-all ${t.disabled ? 'opacity-30 bg-gray-100 grayscale scale-[0.98]' : 'bg-white border-white shadow-sm'}`}
                 >
                   <div className="flex items-center gap-4" onClick={() => toggleItemSelection(idx)}>
                     <div className={`w-11 h-11 rounded-2xl flex items-center justify-center ${isExpense ? 'bg-rose-50 text-rose-500' : 'bg-emerald-50 text-emerald-600'}`}>
@@ -206,7 +215,7 @@ const BankSync: React.FC<BankSyncProps> = ({ categories, incomeCategories, accou
                     </div>
                     <div className="flex-1 min-w-0 cursor-pointer">
                       <p className="font-bold text-[13px] text-[#4A453E] truncate">{t.notes}</p>
-                      <p className="text-[9px] opacity-40 font-black uppercase tracking-tighter">{t.date} • {cat?.name}</p>
+                      <p className="text-[9px] opacity-40 font-black uppercase tracking-tighter">{t.date} • {cat?.name || 'Da definire'}</p>
                     </div>
                     <div className="text-right">
                       <p className={`font-black text-sm ${isExpense ? 'text-rose-500' : 'text-emerald-600'}`}>

@@ -49,40 +49,40 @@ export interface BankParseInput {
 }
 
 export const parseBankStatement = async (input: BankParseInput, categories: Category[], incomeCategories: any[]): Promise<any[]> => {
-  const textPart = {
-    text: `
-      Analizza questo estratto conto bancario (fornito come testo o file PDF).
-      Estrai ogni singola transazione e convertila in un oggetto JSON.
-      
-      Istruzioni Cruciali:
-      1. Importo: numero positivo sempre.
-      2. Tipo: "SPESA" per addebiti/uscite, "ENTRATA" per accrediti/stipendi/bonifici in entrata.
-      3. Data: formato YYYY-MM-DD.
-      4. Categoria: Scegli l'ID più adatto tra:
-         - SPESE: ${JSON.stringify(categories.map(c => ({ id: c.id, name: c.name })))}
-         - ENTRATE: ${JSON.stringify(incomeCategories.map(c => ({ id: c.id, name: c.name })))}
-      5. Note: Descrizione pulita (es. "Amazon", "Stipendio", "Affitto").
+  const prompt = `
+    Analizza questo estratto conto bancario. Estrai OGNI singola transazione (movimento) e convertila in JSON.
+    Il documento potrebbe essere una tabella complessa in PDF o un testo incollato.
+    
+    REGOLE DI ESTRAZIONE:
+    1. Importo: DEVE essere un numero positivo.
+    2. Tipo: "SPESA" se il movimento è un addebito/uscita (segno meno, colonna 'Avere' o 'Debiti'), "ENTRATA" se è un accredito/stipendio/bonifico (segno più, colonna 'Dare' o 'Crediti').
+    3. Data: Formato standard YYYY-MM-DD. Cerca le date dei movimenti/valuta.
+    4. Categoria: Associa ogni movimento all'ID più pertinente tra questi:
+       - USCITE: ${JSON.stringify(categories.map(c => ({ id: c.id, name: c.name })))}
+       - ENTRATE: ${JSON.stringify(incomeCategories.map(c => ({ id: c.id, name: c.name })))}
+       Se non trovi corrispondenze, usa l'ID della categoria più generica (es. "Spesa" o "Altro").
+    5. Note: Estrai il beneficiario o la causale (es. "Lidl", "Enel", "Stipendio Rossi"). Pulisci il testo da codici superflui.
 
-      Restituisci solo un array JSON puro.
-    `
-  };
+    IMPORTANTE: Sii meticoloso. Se vedi tabelle, analizza riga per riga. Ignora i saldi intermedi, estrai solo i movimenti individuali.
+  `;
 
-  const parts: any[] = [textPart];
+  const parts: any[] = [];
   
   if (input.file) {
+    // Inseriamo prima il file per dare contesto visivo immediato al modello
     parts.push({
       inlineData: {
         data: input.file.data,
         mimeType: input.file.mimeType
       }
     });
-  } else if (input.text) {
-    parts.push({ text: `Testo estratto conto: "${input.text}"` });
   }
+  
+  parts.push({ text: input.text ? `${prompt}\n\nTesto da analizzare: "${input.text}"` : prompt });
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3-pro-preview', // Passiamo al modello Pro per una migliore lettura dei PDF complessi
       contents: [{ parts }],
       config: {
         responseMimeType: "application/json",

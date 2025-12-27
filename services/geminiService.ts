@@ -2,13 +2,13 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Expense, Category, Account } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 export const getFinancialAdvice = async (
   expenses: Expense[],
   categories: Category[],
   accounts: Account[]
 ): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
   if (expenses.length === 0) return "Inizia ad aggiungere spese per ricevere consigli personalizzati!";
 
   const expenseData = expenses.slice(0, 50).map(e => ({
@@ -49,27 +49,29 @@ export interface BankParseInput {
 }
 
 export const parseBankStatement = async (input: BankParseInput, categories: Category[], incomeCategories: any[]): Promise<any[]> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
   const prompt = `
-    Analizza questo estratto conto bancario. Estrai OGNI singola transazione (movimento) e convertila in JSON.
-    Il documento potrebbe essere una tabella complessa in PDF o un testo incollato.
-    
-    REGOLE DI ESTRAZIONE:
-    1. Importo: DEVE essere un numero positivo.
-    2. Tipo: "SPESA" se il movimento è un addebito/uscita (segno meno, colonna 'Avere' o 'Debiti'), "ENTRATA" se è un accredito/stipendio/bonifico (segno più, colonna 'Dare' o 'Crediti').
-    3. Data: Formato standard YYYY-MM-DD. Cerca le date dei movimenti/valuta.
-    4. Categoria: Associa ogni movimento all'ID più pertinente tra questi:
+    Analizza attentamente questo estratto conto bancario italiano. 
+    Il tuo compito è estrarre OGNI movimento di denaro presente.
+
+    REGOLE CRITICHE DI ANALISI:
+    1. FORMATO NUMERICO: Negli estratti conto italiani, la virgola (,) è spesso usata per i decimali. Converti tutto nel formato numerico standard (punto per i decimali).
+    2. SEGNO E TIPO: 
+       - Se l'importo è un addebito (Uscita, Segno meno, Colonna Avere/Debiti), usa type: "SPESA".
+       - Se l'importo è un accredito (Entrata, Bonifico, Stipendio, Colonna Dare/Crediti), usa type: "ENTRATA".
+       - L'importo nel JSON finale deve essere sempre POSITIVO.
+    3. DATE: Converti le date (spesso GG/MM o GG/MM/AA) nel formato standard YYYY-MM-DD. Assumi l'anno corrente se non specificato.
+    4. CATEGORIZZAZIONE: Associa ogni riga a uno di questi ID:
        - USCITE: ${JSON.stringify(categories.map(c => ({ id: c.id, name: c.name })))}
        - ENTRATE: ${JSON.stringify(incomeCategories.map(c => ({ id: c.id, name: c.name })))}
-       Se non trovi corrispondenze, usa l'ID della categoria più generica (es. "Spesa" o "Altro").
-    5. Note: Estrai il beneficiario o la causale (es. "Lidl", "Enel", "Stipendio Rossi"). Pulisci il testo da codici superflui.
+    5. NOTE: Scrivi una descrizione pulita (es: "Supermercato Conad", "Bonifico Stipendio").
 
-    IMPORTANTE: Sii meticoloso. Se vedi tabelle, analizza riga per riga. Ignora i saldi intermedi, estrai solo i movimenti individuali.
+    DOC DA ANALIZZARE: PDF o Testo allegato. Analizza riga per riga la tabella dei movimenti.
   `;
 
   const parts: any[] = [];
-  
   if (input.file) {
-    // Inseriamo prima il file per dare contesto visivo immediato al modello
     parts.push({
       inlineData: {
         data: input.file.data,
@@ -77,14 +79,14 @@ export const parseBankStatement = async (input: BankParseInput, categories: Cate
       }
     });
   }
-  
-  parts.push({ text: input.text ? `${prompt}\n\nTesto da analizzare: "${input.text}"` : prompt });
+  parts.push({ text: input.text ? `${prompt}\n\nTESTO: ${input.text}` : prompt });
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview', // Passiamo al modello Pro per una migliore lettura dei PDF complessi
+      model: 'gemini-3-pro-preview',
       contents: [{ parts }],
       config: {
+        thinkingConfig: { thinkingBudget: 4000 }, // Budget di pensiero per analizzare tabelle PDF complesse
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
